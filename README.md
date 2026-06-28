@@ -22,6 +22,7 @@ Implemented:
 - `normalize` adapters for Pi, Claude Code, and Codex JSONL traces
 - native `cursor` transcript adapter
 - `aider` and `markdown-transcript` adapters for markdown-style CLI histories
+- explicit `opencode`, `continue`, and `goose` aliases for OpenAI-compatible JSONL exports
 - generic `openai-chat` and `anthropic-messages` adapters for harnesses that already export API-shaped message logs
 - `normalize --source auto` source detection
 - `normalize-dir` for combining a directory of trace JSONL files into one canonical JSONL shard
@@ -53,10 +54,15 @@ Supported source values:
 - `claude-code`
 - `codex`
 - `cursor`
+- `opencode`
+- `continue`
+- `goose`
 - `openai-chat`
 - `anthropic-messages`
 - `aider`
 - `markdown-transcript`
+
+`opencode`, `continue`, and `goose` currently expect OpenAI-compatible exported JSONL: either one line with a `messages` array or one message per JSONL line. Native private session-store parsers should be added against real samples when those formats differ.
 
 Normalize a directory into one shard:
 

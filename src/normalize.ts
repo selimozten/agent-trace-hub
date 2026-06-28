@@ -60,6 +60,27 @@ const ADAPTERS: SourceAdapter[] = [
     normalize: normalizeAnthropicMessagesSession,
   },
   {
+    source: "opencode",
+    sourceFormat: "opencode-openai-compatible-jsonl",
+    defaultAgent: "opencode",
+    detect: neverAutoDetect,
+    normalize: normalizeOpenAIChatSession,
+  },
+  {
+    source: "continue",
+    sourceFormat: "continue-openai-compatible-jsonl",
+    defaultAgent: "continue",
+    detect: neverAutoDetect,
+    normalize: normalizeOpenAIChatSession,
+  },
+  {
+    source: "goose",
+    sourceFormat: "goose-openai-compatible-jsonl",
+    defaultAgent: "goose",
+    detect: neverAutoDetect,
+    normalize: normalizeOpenAIChatSession,
+  },
+  {
     source: "openai-chat",
     sourceFormat: "openai-chat-jsonl",
     defaultAgent: "openai-compatible",
@@ -218,6 +239,10 @@ function baseTrace(
 function detectPi(records: JsonObject[]): boolean {
   return records.some((record) => record.type === "session" && typeof record.version === "number" && typeof record.id === "string")
     && records.some((record) => record.type === "message" && isRecord(record.message));
+}
+
+function neverAutoDetect(_records: JsonObject[]): boolean {
+  return false;
 }
 
 function normalizePiSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
@@ -415,7 +440,7 @@ function detectOpenAIChat(records: JsonObject[]): boolean {
 }
 
 function normalizeOpenAIChatSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
-  const adapter = adapterFor("openai-chat");
+  const adapter = adapterFor(options.source === "opencode" || options.source === "continue" || options.source === "goose" ? options.source : "openai-chat");
   const root = records.length === 1 && Array.isArray(records[0].messages) ? records[0] : undefined;
   const sourceMessages = root ? recordsFromArray(records[0].messages as JsonValue[]) : records;
   const messages: CanonicalMessage[] = [];

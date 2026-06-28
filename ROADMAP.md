@@ -10,6 +10,9 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 | Claude Code | yes | yes | yes | Handles nested `message`, thinking, text, tool use, and tool result blocks. |
 | Codex | yes | yes | yes | Handles rollout envelopes, response items, reasoning summaries, function calls, and tool outputs. |
 | Cursor | yes | yes | yes | Handles Cursor `agent-transcripts` JSONL with top-level role and nested message content. |
+| OpenCode | yes | no | yes | Explicit source alias for OpenAI-compatible exported JSONL; native private store parser still needs real samples. |
+| Continue | yes | no | yes | Explicit source alias for OpenAI-compatible exported JSONL; IDE extension state parser still needs real samples. |
+| Goose | yes | no | yes | Explicit source alias for OpenAI-compatible exported JSONL; native session parser still needs real samples. |
 | Aider markdown history | yes | yes | yes | Handles common markdown role sections and `####` user prompts. |
 | Markdown transcript | yes | yes | yes | Generic explicit role-heading transcript fallback. |
 | OpenAI-compatible chat | yes | yes | yes | Covers harnesses that persist OpenAI Chat Completions-style `messages`. |
@@ -19,9 +22,9 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 
 | Harness/source | Priority | Notes |
 | --- | --- | --- |
-| OpenCode | high | Common OpenAI-compatible coding CLI; likely JSON event logs/config-dependent. |
-| Continue | medium | Often stores chat/session data in IDE extension state. |
-| Goose | medium | Tool-call/session schema should map cleanly to canonical messages. |
+| OpenCode native logs | high | Add a verified parser for local/session-store logs if they differ from OpenAI-compatible exports. |
+| Continue native logs | medium | Often stores chat/session data in IDE extension state. |
+| Goose native logs | medium | Tool-call/session schema should map cleanly to canonical messages once real samples are available. |
 | raw OpenAI chat logs | done | Useful fallback adapter for many harnesses. |
 | raw Anthropic messages | done | Useful fallback adapter for Claude-derived traces. |
 

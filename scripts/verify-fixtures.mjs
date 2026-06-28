@@ -10,6 +10,9 @@ const fixtures = [
   ["claude-code", "examples/claude-code-session.jsonl", "examples/claude-code-session.agent_trace_v1.jsonl"],
   ["codex", "examples/codex-session.jsonl", "examples/codex-session.agent_trace_v1.jsonl"],
   ["cursor", "examples/cursor-session.jsonl", "examples/cursor-session.agent_trace_v1.jsonl"],
+  ["opencode", "examples/opencode-session.jsonl", "examples/opencode-session.agent_trace_v1.jsonl"],
+  ["continue", "examples/continue-session.jsonl", "examples/continue-session.agent_trace_v1.jsonl"],
+  ["goose", "examples/goose-session.jsonl", "examples/goose-session.agent_trace_v1.jsonl"],
   ["openai-chat", "examples/openai-chat-session.jsonl", "examples/openai-chat-session.agent_trace_v1.jsonl"],
   ["anthropic-messages", "examples/anthropic-messages-session.jsonl", "examples/anthropic-messages-session.agent_trace_v1.jsonl"],
   ["aider", "examples/aider-history.md", "examples/aider-history.agent_trace_v1.jsonl"],
@@ -48,6 +51,13 @@ assertJsonl("examples/codex-session.agent_trace_v1.jsonl", (trace) => {
   assert(trace.messages.length === 3, "codex fixture should coalesce to 3 messages");
   assert(trace.messages[1].tool_calls?.[0]?.arguments?.cmd === "pytest -q", "codex tool args not parsed");
 });
+
+for (const source of ["opencode", "continue", "goose"]) {
+  assertJsonl(`examples/${source}-session.agent_trace_v1.jsonl`, (trace) => {
+    assert(trace.source.agent === source, `${source} fixture should preserve explicit source agent`);
+    assert(trace.source.source_format === `${source}-openai-compatible-jsonl`, `${source} fixture source_format mismatch`);
+  });
+}
 
 fs.rmSync(path.join(root, "examples/codex-session.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(path.join(root, "examples/anthropic-messages-session.auto.agent_trace_v1.jsonl"), { force: true });

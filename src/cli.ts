@@ -81,7 +81,7 @@ Grep options:
   <pattern>              Ripgrep pattern to run against uploadable sessions
 
 Normalize options:
-  --source <source>       Input source format: auto, pi, claude-code, codex, cursor, openai-chat, anthropic-messages, markdown-transcript, aider
+  --source <source>       Input source format: auto, pi, claude-code, codex, cursor, opencode, continue, goose, openai-chat, anthropic-messages, markdown-transcript, aider
   --input <file>          Source session file
   --output <file>         Output canonical agent_trace_v1 JSONL
   --input-dir <dir>       Source directory for normalize-dir
@@ -345,11 +345,11 @@ export function parseRenderArgs(args: string[]): RenderOptions {
 }
 
 function isNormalizeSource(source: string): boolean {
-  return ["auto", "pi", "claude-code", "codex", "cursor", "openai-chat", "anthropic-messages", "markdown-transcript", "aider"].includes(source);
+  return ["auto", "pi", "claude-code", "codex", "cursor", "opencode", "continue", "goose", "openai-chat", "anthropic-messages", "markdown-transcript", "aider"].includes(source);
 }
 
 function normalizeSourceList(): string {
-  return "auto, pi, claude-code, codex, cursor, openai-chat, anthropic-messages, markdown-transcript, aider";
+  return "auto, pi, claude-code, codex, cursor, opencode, continue, goose, openai-chat, anthropic-messages, markdown-transcript, aider";
 }
 
 function requireValue(args: string[], index: number, flag: string): string {
