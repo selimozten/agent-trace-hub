@@ -197,6 +197,14 @@ assertJsonl("examples/codex-session.agent_trace_v1.jsonl", (trace) => {
   assert(trace.messages.length === 3, "codex fixture should coalesce to 3 messages");
   assert(trace.messages[1].tool_calls?.[0]?.arguments?.cmd === "pytest -q", "codex tool args not parsed");
 });
+assertJsonl("examples/openai-chat-session.agent_trace_v1.jsonl", (trace) => {
+  assert(trace.tools.length === 1, "OpenAI fixture should preserve tool schemas");
+  assert(trace.tools[0]?.function?.name === "shell", "OpenAI fixture tool schema name mismatch");
+});
+assertJsonl("examples/anthropic-messages-session.agent_trace_v1.jsonl", (trace) => {
+  assert(trace.tools.length === 1, "Anthropic fixture should preserve tool schemas");
+  assert(trace.tools[0]?.input_schema?.properties?.command?.type === "string", "Anthropic fixture tool schema mismatch");
+});
 assertInvalidArtifact("agent-trace", [{ schema: "agent_trace_v1", session_id: "bad" }]);
 
 for (const source of ["opencode", "continue", "goose"]) {

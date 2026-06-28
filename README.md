@@ -24,6 +24,7 @@ Implemented:
 - `aider` and `markdown-transcript` adapters for markdown-style CLI histories
 - explicit `opencode`, `continue`, and `goose` aliases for OpenAI-compatible JSONL exports
 - generic `openai-chat` and `anthropic-messages` adapters for harnesses that already export API-shaped message logs
+- preservation of source tool schemas when API-shaped exports include them
 - `normalize --source auto` source detection
 - `discover` for finding local candidate traces from common coding-agent harnesses
 - `ingest` for normalizing mixed-source discovery manifests into one canonical shard

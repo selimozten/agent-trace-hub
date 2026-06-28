@@ -1,0 +1,6 @@
+node_modules/
+examples/
+src/
+scripts/
+.github/
+*.log

@@ -66,7 +66,6 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 - Move source adapters into separate modules once more than five are implemented.
 - Add LLM-assisted review gates for canonical shards.
 - Add configurable redaction profiles for local/private/public release modes.
-- Preserve tool schemas when source logs include them.
 - Add outcome enrichers for final diff, tests run, exit codes, build status, and user acceptance.
 - Add CI with `npm run check`, `npm test`, and `npm run build`.
 - Resolve licensing before publishing a public fork based on upstream code.

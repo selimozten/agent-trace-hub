@@ -23,6 +23,11 @@ interface SourceAdapter {
   normalize(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace;
 }
 
+type BaseTraceOverrides = Partial<CanonicalTrace["source"]> & {
+  session_id?: string;
+  tools?: JsonObject[];
+};
+
 const ADAPTERS: SourceAdapter[] = [
   {
     source: "pi",
@@ -216,7 +221,7 @@ function baseTrace(
   inputPath: string,
   adapter: SourceAdapter,
   options: NormalizeOptions,
-  overrides: Partial<CanonicalTrace["source"]> & { session_id?: string },
+  overrides: BaseTraceOverrides,
   messages: CanonicalMessage[],
 ): CanonicalTrace {
   return {
@@ -233,7 +238,7 @@ function baseTrace(
     metadata: {
       source_file: inputPath,
     },
-    tools: [],
+    tools: overrides.tools ?? [],
     messages,
     outcome: {
       quality: "unlabeled",
@@ -451,12 +456,13 @@ function normalizeOpenAIChatSession(inputPath: string, records: JsonObject[], op
   const messages: CanonicalMessage[] = [];
   const sessionId = typeof root?.id === "string" ? root.id : path.basename(inputPath, ".jsonl");
   const model = options.model ?? (typeof root?.model === "string" ? root.model : undefined);
+  const tools = extractToolSchemas(root?.tools);
 
   for (const message of sourceMessages) {
     messages.push(...normalizeOpenAIChatMessage(message));
   }
 
-  return baseTrace(inputPath, adapter, { ...options, model }, { session_id: sessionId, model, provider: "openai" }, messages);
+  return baseTrace(inputPath, adapter, { ...options, model }, { session_id: sessionId, model, provider: "openai", tools }, messages);
 }
 
 function normalizeOpenAIChatMessage(message: JsonObject): CanonicalMessage[] {
@@ -518,6 +524,7 @@ function normalizeAnthropicMessagesSession(inputPath: string, records: JsonObjec
   const messages: CanonicalMessage[] = [];
   const sessionId = typeof root?.id === "string" ? root.id : path.basename(inputPath, ".jsonl");
   const model = options.model ?? (typeof root?.model === "string" ? root.model : undefined);
+  const tools = extractToolSchemas(root?.tools);
 
   if (typeof root?.system === "string" && root.system) {
     messages.push({ role: "system", content: [{ type: "text", text: root.system }] });
@@ -526,11 +533,16 @@ function normalizeAnthropicMessagesSession(inputPath: string, records: JsonObjec
     messages.push(...normalizeAgentMessage(message));
   }
 
-  return baseTrace(inputPath, adapter, { ...options, model }, { session_id: sessionId, model, provider: "anthropic" }, messages);
+  return baseTrace(inputPath, adapter, { ...options, model }, { session_id: sessionId, model, provider: "anthropic", tools }, messages);
 }
 
 function recordsFromArray(values: JsonValue[]): JsonObject[] {
   return values.filter((value): value is JsonObject => isRecord(value));
+}
+
+function extractToolSchemas(value: JsonValue | undefined): JsonObject[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((tool): tool is JsonObject => isRecord(tool));
 }
 
 function rawText(records: JsonObject[]): string | undefined {
