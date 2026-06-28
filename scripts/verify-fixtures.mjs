@@ -15,6 +15,7 @@ const fixtures = [
   ["goose", "examples/goose-session.jsonl", "examples/goose-session.agent_trace_v1.jsonl"],
   ["openai-chat", "examples/openai-chat-session.jsonl", "examples/openai-chat-session.agent_trace_v1.jsonl"],
   ["anthropic-messages", "examples/anthropic-messages-session.jsonl", "examples/anthropic-messages-session.agent_trace_v1.jsonl"],
+  ["generic-json", "examples/generic-json-session.json", "examples/generic-json-session.agent_trace_v1.jsonl"],
   ["aider", "examples/aider-history.md", "examples/aider-history.agent_trace_v1.jsonl"],
   ["markdown-transcript", "examples/markdown-transcript.md", "examples/markdown-transcript.agent_trace_v1.jsonl"],
 ];
@@ -30,6 +31,8 @@ run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/anthropi
 run([...nodeArgs, "validate", "--input", "examples/anthropic-messages-session.auto.agent_trace_v1.jsonl"]);
 run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/cursor-session.jsonl", "--output", "examples/cursor-session.auto.agent_trace_v1.jsonl"]);
 run([...nodeArgs, "validate", "--input", "examples/cursor-session.auto.agent_trace_v1.jsonl"]);
+run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/generic-json-session.json", "--output", "examples/generic-json-session.auto.agent_trace_v1.jsonl"]);
+run([...nodeArgs, "validate", "--input", "examples/generic-json-session.auto.agent_trace_v1.jsonl"]);
 run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/aider-history.md", "--output", "examples/aider-history.auto.agent_trace_v1.jsonl"]);
 run([...nodeArgs, "validate", "--input", "examples/aider-history.auto.agent_trace_v1.jsonl"]);
 
@@ -126,7 +129,7 @@ assertInvalidArtifact("audit", { schema: "agent_trace_audit_v1", input: "x", cre
 const cleanAudit = JSON.parse(fs.readFileSync(cleanAuditReport, "utf-8"));
 assert(cleanAudit.schema === "agent_trace_audit_v1", "audit schema mismatch");
 assert(cleanAudit.status === "pass", "clean audit should pass");
-assert(cleanAudit.trace_count === 11, "clean audit trace count mismatch");
+assert(cleanAudit.trace_count === 12, "clean audit trace count mismatch");
 const approvalReport = path.join(root, "examples/.tmp-approval.json");
 run([...nodeArgs, "approve", "--audit-report", cleanAuditReport, "--output", approvalReport, "--reviewer", "fixture-reviewer", "--notes", "fixture approved"]);
 run([...nodeArgs, "validate-artifact", "--kind", "approval", "--input", approvalReport]);
@@ -180,14 +183,14 @@ assertInvalidArtifact("release-info", { name: "x", schema: "agent_trace_v1", cre
 const releaseManifest = readJsonl(path.join(releaseDir, "manifest.jsonl"));
 const releaseInfo = JSON.parse(fs.readFileSync(path.join(releaseDir, "dataset_info.json"), "utf-8"));
 assert(releaseManifest.length === 1, "release should create one shard manifest entry");
-assert(releaseManifest[0].trace_count === 11, "release manifest trace count mismatch");
+assert(releaseManifest[0].trace_count === 12, "release manifest trace count mismatch");
 assert(releaseManifest[0].message_count > 0, "release manifest should count messages");
 assert(releaseManifest[0].sha256.startsWith("sha256:"), "release manifest should include sha256");
 assert(fs.existsSync(path.join(releaseDir, releaseManifest[0].file)), "release shard missing");
 assert(fs.existsSync(path.join(releaseDir, "schema/agent_trace_v1.schema.json")), "release schema missing");
 assert(fs.existsSync(path.join(releaseDir, "schema/agent_trace_audit_v1.schema.json")), "release audit schema missing");
 assert(releaseInfo.name === "fixture canonical traces", "release dataset name mismatch");
-assert(releaseInfo.trace_count === 11, "release dataset trace count mismatch");
+assert(releaseInfo.trace_count === 12, "release dataset trace count mismatch");
 assert(releaseInfo.source_agents.codex === 1, "release source agent counts missing codex");
 assertCommandFails([...nodeArgs, "release", "--input", "examples/all.agent_trace_v1.jsonl", "--output-dir", releaseDir], "release should refuse non-empty output without --force");
 assertCommandFails([...nodeArgs, "release", "--input", dirtyCanonical, "--output-dir", path.join(root, "examples/.tmp-release-dirty"), "--audit-report", dirtyAuditReport], "release should reject failing audit reports");
@@ -205,6 +208,11 @@ assertJsonl("examples/anthropic-messages-session.agent_trace_v1.jsonl", (trace) 
   assert(trace.tools.length === 1, "Anthropic fixture should preserve tool schemas");
   assert(trace.tools[0]?.input_schema?.properties?.command?.type === "string", "Anthropic fixture tool schema mismatch");
 });
+assertJsonl("examples/generic-json-session.agent_trace_v1.jsonl", (trace) => {
+  assert(trace.source.agent === "example-agent", "generic JSON fixture should preserve source agent");
+  assert(trace.tools.length === 1, "generic JSON fixture should preserve tool schemas");
+  assert(trace.messages[1].tool_calls?.[0]?.arguments?.path === "src/App.tsx", "generic JSON fixture should parse tool calls");
+});
 assertInvalidArtifact("agent-trace", [{ schema: "agent_trace_v1", session_id: "bad" }]);
 
 for (const source of ["opencode", "continue", "goose"]) {
@@ -217,6 +225,7 @@ for (const source of ["opencode", "continue", "goose"]) {
 fs.rmSync(path.join(root, "examples/codex-session.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(path.join(root, "examples/anthropic-messages-session.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(path.join(root, "examples/cursor-session.auto.agent_trace_v1.jsonl"), { force: true });
+fs.rmSync(path.join(root, "examples/generic-json-session.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(path.join(root, "examples/aider-history.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(ingestManifest, { force: true });
 fs.rmSync(ingestOutput, { force: true });

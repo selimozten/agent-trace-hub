@@ -24,6 +24,7 @@ Implemented:
 - `aider` and `markdown-transcript` adapters for markdown-style CLI histories
 - explicit `opencode`, `continue`, and `goose` aliases for OpenAI-compatible JSONL exports
 - generic `openai-chat` and `anthropic-messages` adapters for harnesses that already export API-shaped message logs
+- `generic-json` fallback adapter for nested role/content exports such as `history`, `conversation`, `events`, or `transcript`
 - preservation of source tool schemas when API-shaped exports include them
 - `normalize --source auto` source detection
 - `discover` for finding local candidate traces from common coding-agent harnesses
@@ -79,14 +80,17 @@ Supported source values:
 - `goose`
 - `openai-chat`
 - `anthropic-messages`
+- `generic-json`
 - `aider`
 - `markdown-transcript`
 
 `opencode`, `continue`, and `goose` currently expect OpenAI-compatible exported JSONL: either one line with a `messages` array or one message per JSONL line. Native private session-store parsers should be added against real samples when those formats differ.
 
+`generic-json` is a conservative fallback for JSON/JSONL exports that are not provider-shaped but still contain role/content messages. It recognizes common nested arrays such as `messages`, `conversation`, `history`, `turns`, `events`, `transcript`, and `items`, plus role aliases like `human`, `ai`, `model`, and `tool_result`.
+
 `discover` emits a JSONL manifest of candidate trace files with `source`, `normalize_source`, `path`, `kind`, `confidence`, and `reason`. It scans known harness locations under `--root`, including Codex, Claude Code, Cursor, OpenCode, Continue, Goose, Pi, and project-local Aider history files.
 
-`ingest` reads that manifest and uses each row's `normalize_source`, so one shard can contain mixed Codex, Claude Code, Cursor, Aider, OpenAI-compatible, Anthropic-compatible, Pi, OpenCode, Continue, and Goose exports.
+`ingest` reads that manifest and uses each row's `normalize_source`, so one shard can contain mixed Codex, Claude Code, Cursor, Aider, OpenAI-compatible, Anthropic-compatible, generic JSON, Pi, OpenCode, Continue, and Goose exports.
 
 Normalize a directory into one shard:
 

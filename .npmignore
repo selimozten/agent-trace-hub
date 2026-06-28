@@ -4,3 +4,5 @@ src/
 scripts/
 .github/
 *.log
+!dist/
+!dist/**

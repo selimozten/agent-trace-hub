@@ -93,6 +93,13 @@ const ADAPTERS: SourceAdapter[] = [
     normalize: normalizeOpenAIChatSession,
   },
   {
+    source: "generic-json",
+    sourceFormat: "generic-json-chat",
+    defaultAgent: "generic-json",
+    detect: detectGenericJsonChat,
+    normalize: normalizeGenericJsonSession,
+  },
+  {
     source: "aider",
     sourceFormat: "aider-markdown-history",
     defaultAgent: "aider",
@@ -534,6 +541,112 @@ function normalizeAnthropicMessagesSession(inputPath: string, records: JsonObjec
   }
 
   return baseTrace(inputPath, adapter, { ...options, model }, { session_id: sessionId, model, provider: "anthropic", tools }, messages);
+}
+
+function detectGenericJsonChat(records: JsonObject[]): boolean {
+  return findGenericJsonMessages(records).some((message) => normalizeGenericJsonMessage(message).length > 0);
+}
+
+function normalizeGenericJsonSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
+  const adapter = adapterFor("generic-json");
+  const root = records.length === 1 ? records[0] : undefined;
+  const sourceMessages = findGenericJsonMessages(records);
+  const messages = sourceMessages.flatMap((message) => normalizeGenericJsonMessage(message));
+  const sessionId = firstString(root, ["id", "session_id", "sessionId", "conversation_id", "conversationId", "name"]) ?? path.basename(inputPath, path.extname(inputPath));
+  const model = options.model ?? firstString(root, ["model", "model_id", "modelId"]);
+  const agent = options.agent ?? firstString(root, ["agent", "client", "source"]);
+  const tools = extractToolSchemas(root?.tools);
+  return baseTrace(inputPath, adapter, { ...options, agent, model }, { session_id: sessionId, model, tools }, messages);
+}
+
+function findGenericJsonMessages(records: JsonObject[]): JsonObject[] {
+  if (records.length === 1) {
+    const nested = findBestGenericMessageArray(records[0]);
+    if (nested.length > 0) return nested;
+  }
+  return records.map((record) => unwrapGenericMessage(record)).filter((record): record is JsonObject => record !== undefined);
+}
+
+function findBestGenericMessageArray(root: JsonObject): JsonObject[] {
+  const keys = ["messages", "conversation", "history", "turns", "events", "transcript", "items"];
+  for (const key of keys) {
+    const value = root[key];
+    if (!Array.isArray(value)) continue;
+    const messages = recordsFromArray(value).map((record) => unwrapGenericMessage(record)).filter((record): record is JsonObject => record !== undefined);
+    if (messages.some((message) => normalizeGenericJsonMessage(message).length > 0)) return messages;
+  }
+  return [];
+}
+
+function unwrapGenericMessage(record: JsonObject): JsonObject | undefined {
+  if (hasGenericRole(record)) return record;
+  for (const key of ["message", "entry", "event", "turn"]) {
+    const nested = record[key];
+    if (isRecord(nested) && hasGenericRole(nested)) return nested as JsonObject;
+  }
+  return undefined;
+}
+
+function normalizeGenericJsonMessage(message: JsonObject): CanonicalMessage[] {
+  const role = genericRole(message);
+  if (!role) return [];
+  const content = genericContent(message);
+
+  if (role === "system" || role === "developer" || role === "user") {
+    return splitUserLikeMessage(role, content);
+  }
+
+  if (role === "assistant") {
+    const out: CanonicalMessage = { role: "assistant" };
+    const reasoning = firstString(message, ["reasoning", "thinking", "thought"]);
+    const contentBlocks = normalizeContentBlocks(content);
+    if (reasoning) out.reasoning = [{ type: "text", text: reasoning }];
+    if (contentBlocks.length > 0) out.content = contentBlocks;
+    const callsValue = Array.isArray(message.tool_calls) ? message.tool_calls : Array.isArray(message.toolCalls) ? message.toolCalls : undefined;
+    const calls = callsValue?.map((call, index) => normalizeOpenAIToolCall(call, index)).filter((call): call is CanonicalToolCall => call !== undefined) ?? [];
+    if (calls.length > 0) out.tool_calls = calls;
+    return Object.keys(out).length > 1 ? [out] : [];
+  }
+
+  return [{
+    role: "tool",
+    tool_call_id: firstString(message, ["tool_call_id", "toolCallId", "call_id", "callId"]),
+    name: firstString(message, ["name", "tool_name", "toolName"]) ?? "tool",
+    content: normalizeContentBlocks(content),
+  }];
+}
+
+function hasGenericRole(record: JsonObject): boolean {
+  return genericRole(record) !== undefined;
+}
+
+function genericRole(record: JsonObject): CanonicalMessage["role"] | undefined {
+  const rawRole = firstString(record, ["role", "speaker", "author", "type", "kind"]);
+  if (!rawRole) return undefined;
+  const role = rawRole.toLowerCase();
+  if (role === "system") return "system";
+  if (role === "developer") return "developer";
+  if (role === "user" || role === "human" || role === "request") return "user";
+  if (role === "assistant" || role === "ai" || role === "model" || role === "bot" || role === "response") return "assistant";
+  if (role === "tool" || role === "function" || role === "tool_result" || role === "toolresult") return "tool";
+  return undefined;
+}
+
+function genericContent(record: JsonObject): JsonValue | undefined {
+  for (const key of ["content", "message", "text", "value", "output", "response"]) {
+    const value = record[key];
+    if (typeof value === "string" || Array.isArray(value)) return value;
+  }
+  return undefined;
+}
+
+function firstString(record: JsonObject | undefined, keys: string[]): string | undefined {
+  if (!record) return undefined;
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === "string" && value) return value;
+  }
+  return undefined;
 }
 
 function recordsFromArray(values: JsonValue[]): JsonObject[] {

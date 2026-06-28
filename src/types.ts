@@ -119,6 +119,7 @@ export type NormalizeSource =
   | "goose"
   | "openai-chat"
   | "anthropic-messages"
+  | "generic-json"
   | "markdown-transcript"
   | "aider";
 

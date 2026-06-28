@@ -32,6 +32,7 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 | Markdown transcript | yes | yes | yes | Generic explicit role-heading transcript fallback. |
 | OpenAI-compatible chat | yes | yes | yes | Covers harnesses that persist OpenAI Chat Completions-style `messages`. |
 | Anthropic-compatible messages | yes | yes | yes | Covers harnesses that persist Anthropic `messages` content blocks. |
+| Generic JSON chat | yes | yes | yes | Conservative fallback for nested `history`, `conversation`, `events`, `transcript`, or similar role/content exports. |
 
 ## Next Source Adapters
 

@@ -17,6 +17,7 @@ const NORMALIZE_SOURCES = new Set<ConcreteSource>([
   "goose",
   "openai-chat",
   "anthropic-messages",
+  "generic-json",
   "markdown-transcript",
   "aider",
 ]);

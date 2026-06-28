@@ -104,7 +104,7 @@ Ingest options:
   --continue-on-error     Keep ingesting remaining manifest entries after failures
 
 Normalize options:
-  --source <source>       Input source format: auto, pi, claude-code, codex, cursor, opencode, continue, goose, openai-chat, anthropic-messages, markdown-transcript, aider
+  --source <source>       Input source format: auto, pi, claude-code, codex, cursor, opencode, continue, goose, openai-chat, anthropic-messages, generic-json, markdown-transcript, aider
   --input <file>          Source session file
   --output <file>         Output canonical agent_trace_v1 JSONL
   --input-dir <dir>       Source directory for normalize-dir
@@ -531,11 +531,11 @@ export function parseReleaseArgs(args: string[]): ReleaseOptions {
 }
 
 function isNormalizeSource(source: string): boolean {
-  return ["auto", "pi", "claude-code", "codex", "cursor", "opencode", "continue", "goose", "openai-chat", "anthropic-messages", "markdown-transcript", "aider"].includes(source);
+  return ["auto", "pi", "claude-code", "codex", "cursor", "opencode", "continue", "goose", "openai-chat", "anthropic-messages", "generic-json", "markdown-transcript", "aider"].includes(source);
 }
 
 function normalizeSourceList(): string {
-  return "auto, pi, claude-code, codex, cursor, opencode, continue, goose, openai-chat, anthropic-messages, markdown-transcript, aider";
+  return "auto, pi, claude-code, codex, cursor, opencode, continue, goose, openai-chat, anthropic-messages, generic-json, markdown-transcript, aider";
 }
 
 function isArtifactKind(kind: string): kind is ArtifactKind {
