@@ -70,6 +70,7 @@ for (const file of [
 fs.writeFileSync(path.join(discoverRoot, ".aider.chat.history.md"), "#### user\n\nhello\n");
 run([...nodeArgs, "discover", "--root", discoverRoot, "--output", discoverOutput]);
 run([...nodeArgs, "validate-artifact", "--kind", "discovery", "--input", discoverOutput]);
+assertInvalidArtifact("discovery", [{ source: "codex", path: "missing-normalize-source.jsonl", kind: "jsonl", confidence: "high", reason: "fixture" }]);
 const discovered = readJsonl(discoverOutput);
 for (const source of ["aider", "claude-code", "codex", "continue", "cursor", "goose", "opencode", "pi"]) {
   assert(discovered.some((entry) => entry.source === source && entry.normalize_source === source), `discover missing ${source}`);
@@ -113,6 +114,7 @@ fs.writeFileSync(ingestErrorManifest, [
 run([...nodeArgs, "ingest", "--manifest", ingestErrorManifest, "--output", ingestErrorOutput, "--error-output", ingestErrors, "--continue-on-error"]);
 assert(readJsonl(ingestErrorOutput).length === 1, "ingest should keep successful entries with --continue-on-error");
 run([...nodeArgs, "validate-artifact", "--kind", "ingest-error", "--input", ingestErrors]);
+assertInvalidArtifact("ingest-error", [{ path: "x.jsonl" }]);
 const ingestErrorRows = readJsonl(ingestErrors);
 assert(ingestErrorRows.length === 1, "ingest should write one error");
 assertCommandFails([...nodeArgs, "ingest", "--manifest", ingestErrorManifest, "--output", path.join(root, "examples/.tmp-ingest-fail.agent_trace_v1.jsonl")], "ingest should fail fast without --continue-on-error");
@@ -120,6 +122,7 @@ assertCommandFails([...nodeArgs, "ingest", "--manifest", ingestErrorManifest, "-
 const cleanAuditReport = path.join(root, "examples/.tmp-audit-clean.json");
 run([...nodeArgs, "audit", "--input", "examples/all.agent_trace_v1.jsonl", "--output", cleanAuditReport]);
 run([...nodeArgs, "validate-artifact", "--kind", "audit", "--input", cleanAuditReport]);
+assertInvalidArtifact("audit", { schema: "agent_trace_audit_v1", input: "x", created_at: "now", trace_count: 1 });
 const cleanAudit = JSON.parse(fs.readFileSync(cleanAuditReport, "utf-8"));
 assert(cleanAudit.schema === "agent_trace_audit_v1", "audit schema mismatch");
 assert(cleanAudit.status === "pass", "clean audit should pass");
@@ -127,6 +130,7 @@ assert(cleanAudit.trace_count === 11, "clean audit trace count mismatch");
 const approvalReport = path.join(root, "examples/.tmp-approval.json");
 run([...nodeArgs, "approve", "--audit-report", cleanAuditReport, "--output", approvalReport, "--reviewer", "fixture-reviewer", "--notes", "fixture approved"]);
 run([...nodeArgs, "validate-artifact", "--kind", "approval", "--input", approvalReport]);
+assertInvalidArtifact("approval", { schema: "agent_trace_approval_v1", status: "pending" });
 const approval = JSON.parse(fs.readFileSync(approvalReport, "utf-8"));
 assert(approval.schema === "agent_trace_approval_v1", "approval schema mismatch");
 assert(approval.status === "approved", "approval status mismatch");
@@ -171,6 +175,8 @@ run([
 ]);
 run([...nodeArgs, "validate-artifact", "--kind", "release-manifest", "--input", path.join(releaseDir, "manifest.jsonl")]);
 run([...nodeArgs, "validate-artifact", "--kind", "release-info", "--input", path.join(releaseDir, "dataset_info.json")]);
+assertInvalidArtifact("release-manifest", [{ file: "data/shard.jsonl", source_file: "x", schema: "agent_trace_v1", sha256: "not-a-sha", trace_count: 1, message_count: 1, source_agents: {} }]);
+assertInvalidArtifact("release-info", { name: "x", schema: "agent_trace_v1", created_at: "now", license: "other", shard_count: 1 });
 const releaseManifest = readJsonl(path.join(releaseDir, "manifest.jsonl"));
 const releaseInfo = JSON.parse(fs.readFileSync(path.join(releaseDir, "dataset_info.json"), "utf-8"));
 assert(releaseManifest.length === 1, "release should create one shard manifest entry");
@@ -191,6 +197,7 @@ assertJsonl("examples/codex-session.agent_trace_v1.jsonl", (trace) => {
   assert(trace.messages.length === 3, "codex fixture should coalesce to 3 messages");
   assert(trace.messages[1].tool_calls?.[0]?.arguments?.cmd === "pytest -q", "codex tool args not parsed");
 });
+assertInvalidArtifact("agent-trace", [{ schema: "agent_trace_v1", session_id: "bad" }]);
 
 for (const source of ["opencode", "continue", "goose"]) {
   assertJsonl(`examples/${source}-session.agent_trace_v1.jsonl`, (trace) => {
@@ -232,6 +239,17 @@ function assertCommandFails(args, message) {
     return;
   }
   throw new Error(message);
+}
+
+function assertInvalidArtifact(kind, value) {
+  const file = path.join(root, `examples/.tmp-invalid-${kind}.json${Array.isArray(value) ? "l" : ""}`);
+  if (Array.isArray(value)) {
+    fs.writeFileSync(file, value.map((entry) => JSON.stringify(entry)).join("\n") + "\n");
+  } else {
+    fs.writeFileSync(file, `${JSON.stringify(value)}\n`);
+  }
+  assertCommandFails([...nodeArgs, "validate-artifact", "--kind", kind, "--input", file], `validate-artifact should reject invalid ${kind}`);
+  fs.rmSync(file, { force: true });
 }
 
 function assertJsonl(file, check) {

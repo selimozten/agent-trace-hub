@@ -230,6 +230,7 @@ npm run build
 - canonical schema validation
 - artifact schema validation for discovery, ingest errors, audit, approval, and release metadata
 - user-facing `validate-artifact` coverage for every packaged schema
+- malformed artifact rejection coverage for every `validate-artifact` kind
 - deterministic canonical audit pass/fail behavior and release gating
 - human approval artifact generation and release gating
 - canonical release packaging, manifest counts, and overwrite protection
