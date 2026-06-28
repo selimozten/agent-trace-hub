@@ -1,7 +1,8 @@
 #!/usr/bin/env node --experimental-strip-types --no-warnings=ExperimentalWarning
 
-import { parseCollectArgs, parseGrepArgs, parseInitArgs, parseListArgs, parseNormalizeArgs, parseNormalizeDirArgs, parseRejectArgs, parseRenderArgs, parseReviewArgs, parseUploadArgs, parseValidateArgs, printUsage } from "./cli.ts";
+import { parseCollectArgs, parseDiscoverArgs, parseGrepArgs, parseInitArgs, parseListArgs, parseNormalizeArgs, parseNormalizeDirArgs, parseRejectArgs, parseRenderArgs, parseReviewArgs, parseUploadArgs, parseValidateArgs, printUsage } from "./cli.ts";
 import { runCollect, runInit } from "./collect.ts";
+import { runDiscover } from "./discover.ts";
 import { runNormalize, runNormalizeDir } from "./normalize.ts";
 import { runRender } from "./render.ts";
 import { ensureStartupTools } from "./process.ts";
@@ -54,6 +55,11 @@ async function main(): Promise<void> {
 
   if (command === "grep") {
     await runGrep(parseGrepArgs(args.slice(1)));
+    return;
+  }
+
+  if (command === "discover") {
+    await runDiscover(parseDiscoverArgs(args.slice(1)));
     return;
   }
 

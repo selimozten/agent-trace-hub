@@ -93,6 +93,21 @@ export interface GrepOptions {
   ignoreCase: boolean;
 }
 
+export interface DiscoverOptions {
+  root: string;
+  output?: string;
+  source?: NormalizeSource | "all";
+}
+
+export interface DiscoveredTrace {
+  source: Exclude<NormalizeSource, "auto">;
+  normalize_source: Exclude<NormalizeSource, "auto">;
+  path: string;
+  kind: "jsonl" | "markdown" | "unknown";
+  confidence: "high" | "medium" | "low";
+  reason: string;
+}
+
 export type NormalizeSource =
   | "auto"
   | "pi"

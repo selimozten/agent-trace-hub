@@ -2,6 +2,16 @@
 
 The target is a production-ready trace pipeline that can ingest major coding-agent harnesses, normalize them into `agent_trace_v1`, review/redact them safely, and render them for multiple model families.
 
+## Current Pipeline
+
+| Stage | Status | Notes |
+| --- | --- | --- |
+| Discover local trace files | yes | `discover` scans known Codex, Claude Code, Cursor, OpenCode, Continue, Goose, Pi, and project-local Aider paths and emits a JSONL manifest. |
+| Normalize raw traces | yes | Converts supported sources into `agent_trace_v1`. |
+| Validate canonical shards | yes | Validates required canonical structure and message/tool-call invariants. |
+| Render training targets | yes | Renders multiple model-family formats from canonical data. |
+| Review/redact before release | partial | Strong inherited Pi workflow; generic canonical release review still needs a dataset-level command. |
+
 ## Current Support
 
 | Harness/source | Normalize | Auto-detect | Fixture test | Notes |

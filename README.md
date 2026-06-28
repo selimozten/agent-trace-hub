@@ -25,6 +25,7 @@ Implemented:
 - explicit `opencode`, `continue`, and `goose` aliases for OpenAI-compatible JSONL exports
 - generic `openai-chat` and `anthropic-messages` adapters for harnesses that already export API-shaped message logs
 - `normalize --source auto` source detection
+- `discover` for finding local candidate traces from common coding-agent harnesses
 - `normalize-dir` for combining a directory of trace JSONL files into one canonical JSONL shard
 - `validate` for canonical `agent_trace_v1` JSONL
 - `render` for OpenAI chat, Anthropic messages, ChatML, ShareGPT, plain SFT text, and Ornith/Qwen XML training text
@@ -41,6 +42,10 @@ Planned:
 Normalize a trace:
 
 ```bash
+agent-trace-hub discover \
+  --root "$HOME" \
+  --output raw/discovered-traces.jsonl
+
 agent-trace-hub normalize \
   --source auto \
   --input raw/session.jsonl \
@@ -63,6 +68,8 @@ Supported source values:
 - `markdown-transcript`
 
 `opencode`, `continue`, and `goose` currently expect OpenAI-compatible exported JSONL: either one line with a `messages` array or one message per JSONL line. Native private session-store parsers should be added against real samples when those formats differ.
+
+`discover` emits a JSONL manifest of candidate trace files with `source`, `normalize_source`, `path`, `kind`, `confidence`, and `reason`. It scans known harness locations under `--root`, including Codex, Claude Code, Cursor, OpenCode, Continue, Goose, Pi, and project-local Aider history files.
 
 Normalize a directory into one shard:
 
@@ -161,6 +168,7 @@ npm run build
 `npm test` regenerates the examples and verifies:
 
 - Pi, Claude Code, Codex, Cursor, Aider, Markdown transcript, OpenAI-chat, and Anthropic-message normalization
+- local trace discovery for supported harness directories
 - canonical schema validation
 - all supported render formats
 - batch `normalize-dir`

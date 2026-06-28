@@ -1,6 +1,6 @@
 import os from "node:os";
 import path from "node:path";
-import type { CollectOptions, GrepOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, RenderOptions, ReviewOptions, UploadOptions, ValidateOptions } from "./types.ts";
+import type { CollectOptions, DiscoverOptions, GrepOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, RenderOptions, ReviewOptions, UploadOptions, ValidateOptions } from "./types.ts";
 import { loadDenyPatterns } from "./review.ts";
 
 export function printUsage(): void {
@@ -15,6 +15,7 @@ Usage:
   agent-trace-hub reject [--workspace <dir>] <image-or-session>
   agent-trace-hub list [--workspace <dir>] --uploadable
   agent-trace-hub grep [--workspace <dir>] [--ignore-case] <pattern>
+  agent-trace-hub discover [--root <dir>] [--source <source>|all] [--output <file.jsonl>]
   agent-trace-hub normalize --source <source> --input <file.jsonl> --output <file.jsonl> [options]
   agent-trace-hub normalize-dir --source <source> --input-dir <dir> --output <file.jsonl> [options]
   agent-trace-hub validate --input <file.jsonl>
@@ -28,6 +29,7 @@ Commands:
   reject    Add a session to workspace/reject.txt so upload always skips it
   list      List sessions matching built-in filters
   grep      Ripgrep only the uploadable session set
+  discover  Find local candidate trace files from supported coding-agent harnesses
   normalize Convert a supported raw/redacted agent trace into agent_trace_v1
   normalize-dir Convert a directory of JSONL traces into one canonical agent_trace_v1 JSONL
   validate  Validate canonical agent_trace_v1 JSONL
@@ -79,6 +81,11 @@ Grep options:
   --workspace <dir>      Existing workspace (default: .pi/hf-sessions)
   --ignore-case, -i      Case-insensitive search
   <pattern>              Ripgrep pattern to run against uploadable sessions
+
+Discover options:
+  --root <dir>            Home/root directory to scan (default: ~)
+  --source <source>|all   Limit discovery to one source (default: all)
+  --output <file.jsonl>   Write JSONL manifest instead of stdout
 
 Normalize options:
   --source <source>       Input source format: auto, pi, claude-code, codex, cursor, opencode, continue, goose, openai-chat, anthropic-messages, markdown-transcript, aider
@@ -262,6 +269,31 @@ export function parseGrepArgs(args: string[]): GrepOptions {
   }
 
   return { workspace, pattern, ignoreCase };
+}
+
+export function parseDiscoverArgs(args: string[]): DiscoverOptions {
+  let root = os.homedir();
+  let source: DiscoverOptions["source"] = "all";
+  let output: string | undefined;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--root") root = path.resolve(requireValue(args, ++i, "--root"));
+    else if (arg === "--source") {
+      const value = requireValue(args, ++i, "--source");
+      if (value !== "all" && !isNormalizeSource(value)) {
+        throw new Error(`discover --source must be all or one of: ${normalizeSourceList()}`);
+      }
+      source = value as DiscoverOptions["source"];
+    } else if (arg === "--output") output = path.resolve(requireValue(args, ++i, "--output"));
+    else throw new Error(`Unknown discover option: ${arg}`);
+  }
+
+  if (source === "auto") {
+    throw new Error("discover --source does not accept auto; use all or a concrete source");
+  }
+
+  return { root, source, output };
 }
 
 export function parseNormalizeArgs(args: string[]): NormalizeOptions {
