@@ -34,6 +34,7 @@ Implemented:
 - `approve` for explicit human approval artifacts tied to passing audit reports
 - `render` for OpenAI chat, Anthropic messages, ChatML, ShareGPT, plain SFT text, and Ornith/Qwen XML training text
 - `release` for packaging validated canonical shards with manifest metadata and a dataset card
+- GitHub Actions CI for check, test, and build
 - fixture regression test covering normalization, validation, batch normalization, rendering, auto-detection, and Codex assistant-turn coalescing
 
 Planned:
