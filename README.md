@@ -26,6 +26,7 @@ Implemented:
 - generic `openai-chat` and `anthropic-messages` adapters for harnesses that already export API-shaped message logs
 - `normalize --source auto` source detection
 - `discover` for finding local candidate traces from common coding-agent harnesses
+- `ingest` for normalizing mixed-source discovery manifests into one canonical shard
 - `normalize-dir` for combining a directory of trace JSONL files into one canonical JSONL shard
 - `validate` for canonical `agent_trace_v1` JSONL
 - `audit` for deterministic canonical release blockers, including known secrets, deny patterns, and common credential patterns
@@ -54,6 +55,16 @@ agent-trace-hub normalize \
   --output canonical/session.agent_trace_v1.jsonl
 ```
 
+Normalize every supported file from a discovery manifest:
+
+```bash
+agent-trace-hub ingest \
+  --manifest raw/discovered-traces.jsonl \
+  --output canonical/shard-00001.agent_trace_v1.jsonl \
+  --error-output canonical/ingest-errors.jsonl \
+  --continue-on-error
+```
+
 Supported source values:
 
 - `auto`
@@ -72,6 +83,8 @@ Supported source values:
 `opencode`, `continue`, and `goose` currently expect OpenAI-compatible exported JSONL: either one line with a `messages` array or one message per JSONL line. Native private session-store parsers should be added against real samples when those formats differ.
 
 `discover` emits a JSONL manifest of candidate trace files with `source`, `normalize_source`, `path`, `kind`, `confidence`, and `reason`. It scans known harness locations under `--root`, including Codex, Claude Code, Cursor, OpenCode, Continue, Goose, Pi, and project-local Aider history files.
+
+`ingest` reads that manifest and uses each row's `normalize_source`, so one shard can contain mixed Codex, Claude Code, Cursor, Aider, OpenAI-compatible, Anthropic-compatible, Pi, OpenCode, Continue, and Goose exports.
 
 Normalize a directory into one shard:
 
@@ -208,6 +221,7 @@ npm run build
 
 - Pi, Claude Code, Codex, Cursor, Aider, Markdown transcript, OpenAI-chat, and Anthropic-message normalization
 - local trace discovery for supported harness directories
+- mixed-source manifest ingest and error reporting
 - canonical schema validation
 - deterministic canonical audit pass/fail behavior and release gating
 - human approval artifact generation and release gating

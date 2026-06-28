@@ -1,6 +1,6 @@
 import os from "node:os";
 import path from "node:path";
-import type { ApproveOptions, AuditOptions, CollectOptions, DiscoverOptions, GrepOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, ReleaseOptions, RenderOptions, ReviewOptions, UploadOptions, ValidateOptions } from "./types.ts";
+import type { ApproveOptions, AuditOptions, CollectOptions, DiscoverOptions, GrepOptions, IngestOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, ReleaseOptions, RenderOptions, ReviewOptions, UploadOptions, ValidateOptions } from "./types.ts";
 import { loadDenyPatterns } from "./review.ts";
 
 export function printUsage(): void {
@@ -16,6 +16,7 @@ Usage:
   agent-trace-hub list [--workspace <dir>] --uploadable
   agent-trace-hub grep [--workspace <dir>] [--ignore-case] <pattern>
   agent-trace-hub discover [--root <dir>] [--source <source>|all] [--output <file.jsonl>]
+  agent-trace-hub ingest --manifest <file.jsonl> --output <file.jsonl> [options]
   agent-trace-hub normalize --source <source> --input <file.jsonl> --output <file.jsonl> [options]
   agent-trace-hub normalize-dir --source <source> --input-dir <dir> --output <file.jsonl> [options]
   agent-trace-hub validate --input <file.jsonl>
@@ -33,6 +34,7 @@ Commands:
   list      List sessions matching built-in filters
   grep      Ripgrep only the uploadable session set
   discover  Find local candidate trace files from supported coding-agent harnesses
+  ingest    Normalize a mixed-source discovery manifest into one canonical shard
   normalize Convert a supported raw/redacted agent trace into agent_trace_v1
   normalize-dir Convert a directory of JSONL traces into one canonical agent_trace_v1 JSONL
   validate  Validate canonical agent_trace_v1 JSONL
@@ -92,6 +94,12 @@ Discover options:
   --root <dir>            Home/root directory to scan (default: ~)
   --source <source>|all   Limit discovery to one source (default: all)
   --output <file.jsonl>   Write JSONL manifest instead of stdout
+
+Ingest options:
+  --manifest <file.jsonl> Discovery manifest JSONL from discover
+  --output <file.jsonl>   Output canonical agent_trace_v1 JSONL
+  --error-output <file>   Write JSONL ingest errors
+  --continue-on-error     Keep ingesting remaining manifest entries after failures
 
 Normalize options:
   --source <source>       Input source format: auto, pi, claude-code, codex, cursor, opencode, continue, goose, openai-chat, anthropic-messages, markdown-transcript, aider
@@ -323,6 +331,26 @@ export function parseDiscoverArgs(args: string[]): DiscoverOptions {
   }
 
   return { root, source, output };
+}
+
+export function parseIngestArgs(args: string[]): IngestOptions {
+  let manifest = "";
+  let output = "";
+  let errorOutput: string | undefined;
+  let continueOnError = false;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--manifest") manifest = path.resolve(requireValue(args, ++i, "--manifest"));
+    else if (arg === "--output") output = path.resolve(requireValue(args, ++i, "--output"));
+    else if (arg === "--error-output") errorOutput = path.resolve(requireValue(args, ++i, "--error-output"));
+    else if (arg === "--continue-on-error") continueOnError = true;
+    else throw new Error(`Unknown ingest option: ${arg}`);
+  }
+
+  if (!manifest) throw new Error("ingest requires --manifest");
+  if (!output) throw new Error("ingest requires --output");
+  return { manifest, output, errorOutput, continueOnError };
 }
 
 export function parseNormalizeArgs(args: string[]): NormalizeOptions {

@@ -7,6 +7,7 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 | Stage | Status | Notes |
 | --- | --- | --- |
 | Discover local trace files | yes | `discover` scans known Codex, Claude Code, Cursor, OpenCode, Continue, Goose, Pi, and project-local Aider paths and emits a JSONL manifest. |
+| Ingest discovery manifests | yes | `ingest` normalizes mixed-source discovery manifests into a canonical shard with optional error reporting. |
 | Normalize raw traces | yes | Converts supported sources into `agent_trace_v1`. |
 | Validate canonical shards | yes | Validates required canonical structure and message/tool-call invariants. |
 | Audit canonical shards | yes | `audit` performs deterministic checks for known secrets, deny patterns, common credential patterns, and image blocks. |

@@ -104,12 +104,11 @@ const ADAPTERS: SourceAdapter[] = [
 ];
 
 export async function runNormalize(options: NormalizeOptions): Promise<void> {
-  const records = await readJsonlObjects(options.input);
-  const { adapter, trace } = normalizeRecords(options.input, records, options);
+  const { source, trace } = await normalizeFileToTrace(options);
   fs.mkdirSync(path.dirname(options.output), { recursive: true });
   fs.writeFileSync(options.output, `${JSON.stringify(trace)}\n`);
   console.log(`Wrote canonical trace: ${options.output}`);
-  console.log(`Source: ${adapter.source}`);
+  console.log(`Source: ${source}`);
   console.log(`Messages: ${trace.messages.length}`);
 }
 
@@ -135,6 +134,12 @@ export async function runNormalizeDir(options: NormalizeDirOptions): Promise<voi
   console.log(`Wrote canonical traces: ${options.output}`);
   console.log(`Files: ${files.length}`);
   console.log(`Traces: ${traces.length}`);
+}
+
+export async function normalizeFileToTrace(options: NormalizeOptions): Promise<{ source: Exclude<NormalizeSource, "auto">; trace: CanonicalTrace }> {
+  const records = await readJsonlObjects(options.input);
+  const { adapter, trace } = normalizeRecords(options.input, records, options);
+  return { source: adapter.source, trace };
 }
 
 function normalizeRecords(inputPath: string, records: JsonObject[], options: NormalizeOptions): { adapter: SourceAdapter; trace: CanonicalTrace } {

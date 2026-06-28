@@ -138,6 +138,19 @@ export interface NormalizeDirOptions {
   model?: string;
 }
 
+export interface IngestOptions {
+  manifest: string;
+  output: string;
+  errorOutput?: string;
+  continueOnError: boolean;
+}
+
+export interface IngestError {
+  path?: string;
+  source?: string;
+  reason: string;
+}
+
 export type RenderFormat = "openai-chat" | "anthropic-messages" | "chatml" | "sharegpt" | "sft-text" | "ornith-qwen-xml";
 
 export interface RenderOptions {

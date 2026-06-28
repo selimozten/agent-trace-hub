@@ -1,10 +1,11 @@
 #!/usr/bin/env node --experimental-strip-types --no-warnings=ExperimentalWarning
 
-import { parseApproveArgs, parseAuditArgs, parseCollectArgs, parseDiscoverArgs, parseGrepArgs, parseInitArgs, parseListArgs, parseNormalizeArgs, parseNormalizeDirArgs, parseRejectArgs, parseReleaseArgs, parseRenderArgs, parseReviewArgs, parseUploadArgs, parseValidateArgs, printUsage } from "./cli.ts";
+import { parseApproveArgs, parseAuditArgs, parseCollectArgs, parseDiscoverArgs, parseGrepArgs, parseIngestArgs, parseInitArgs, parseListArgs, parseNormalizeArgs, parseNormalizeDirArgs, parseRejectArgs, parseReleaseArgs, parseRenderArgs, parseReviewArgs, parseUploadArgs, parseValidateArgs, printUsage } from "./cli.ts";
 import { runApprove } from "./approve.ts";
 import { runAudit } from "./audit.ts";
 import { runCollect, runInit } from "./collect.ts";
 import { runDiscover } from "./discover.ts";
+import { runIngest } from "./ingest.ts";
 import { runNormalize, runNormalizeDir } from "./normalize.ts";
 import { runRelease } from "./release.ts";
 import { runRender } from "./render.ts";
@@ -63,6 +64,11 @@ async function main(): Promise<void> {
 
   if (command === "discover") {
     await runDiscover(parseDiscoverArgs(args.slice(1)));
+    return;
+  }
+
+  if (command === "ingest") {
+    await runIngest(parseIngestArgs(args.slice(1)));
     return;
   }
 

@@ -80,6 +80,40 @@ const cursorOnly = execFileSync(process.execPath, [...nodeArgs, "discover", "--r
   .map((line) => JSON.parse(line));
 assert(cursorOnly.length === 1 && cursorOnly[0].source === "cursor", "discover --source cursor should only return cursor");
 
+const ingestManifest = path.join(root, "examples/.tmp-ingest-manifest.jsonl");
+const ingestOutput = path.join(root, "examples/.tmp-ingested.agent_trace_v1.jsonl");
+const ingestEntries = [
+  ["codex", "examples/codex-session.jsonl"],
+  ["cursor", "examples/cursor-session.jsonl"],
+  ["opencode", "examples/opencode-session.jsonl"],
+  ["aider", "examples/aider-history.md"],
+].map(([source, file]) => ({
+  source,
+  normalize_source: source,
+  path: path.relative(path.dirname(ingestManifest), path.join(root, file)),
+  kind: file.endsWith(".md") ? "markdown" : "jsonl",
+  confidence: "high",
+  reason: "fixture",
+}));
+fs.writeFileSync(ingestManifest, ingestEntries.map((entry) => JSON.stringify(entry)).join("\n") + "\n");
+run([...nodeArgs, "ingest", "--manifest", ingestManifest, "--output", ingestOutput]);
+run([...nodeArgs, "validate", "--input", ingestOutput]);
+const ingested = readJsonl(ingestOutput);
+assert(ingested.length === 4, "ingest should normalize all fixture manifest entries");
+assert(ingested.some((trace) => trace.source.agent === "opencode"), "ingest should preserve opencode source");
+
+const ingestErrorManifest = path.join(root, "examples/.tmp-ingest-errors-manifest.jsonl");
+const ingestErrorOutput = path.join(root, "examples/.tmp-ingest-errors.agent_trace_v1.jsonl");
+const ingestErrors = path.join(root, "examples/.tmp-ingest-errors.jsonl");
+fs.writeFileSync(ingestErrorManifest, [
+  JSON.stringify({ ...ingestEntries[0], path: path.join(root, "examples/missing.jsonl") }),
+  JSON.stringify(ingestEntries[1]),
+].join("\n") + "\n");
+run([...nodeArgs, "ingest", "--manifest", ingestErrorManifest, "--output", ingestErrorOutput, "--error-output", ingestErrors, "--continue-on-error"]);
+assert(readJsonl(ingestErrorOutput).length === 1, "ingest should keep successful entries with --continue-on-error");
+assert(readJsonl(ingestErrors).length === 1, "ingest should write one error");
+assertCommandFails([...nodeArgs, "ingest", "--manifest", ingestErrorManifest, "--output", path.join(root, "examples/.tmp-ingest-fail.agent_trace_v1.jsonl")], "ingest should fail fast without --continue-on-error");
+
 const cleanAuditReport = path.join(root, "examples/.tmp-audit-clean.json");
 run([...nodeArgs, "audit", "--input", "examples/all.agent_trace_v1.jsonl", "--output", cleanAuditReport]);
 const cleanAudit = JSON.parse(fs.readFileSync(cleanAuditReport, "utf-8"));
@@ -160,6 +194,12 @@ fs.rmSync(path.join(root, "examples/codex-session.auto.agent_trace_v1.jsonl"), {
 fs.rmSync(path.join(root, "examples/anthropic-messages-session.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(path.join(root, "examples/cursor-session.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(path.join(root, "examples/aider-history.auto.agent_trace_v1.jsonl"), { force: true });
+fs.rmSync(ingestManifest, { force: true });
+fs.rmSync(ingestOutput, { force: true });
+fs.rmSync(ingestErrorManifest, { force: true });
+fs.rmSync(ingestErrorOutput, { force: true });
+fs.rmSync(ingestErrors, { force: true });
+fs.rmSync(path.join(root, "examples/.tmp-ingest-fail.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(cleanAuditReport, { force: true });
 fs.rmSync(approvalReport, { force: true });
 fs.rmSync(dirtyAuditReport, { force: true });
