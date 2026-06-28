@@ -1,20 +1,21 @@
 import os from "node:os";
 import path from "node:path";
-import type { CollectOptions, GrepOptions, InitOptions, ListOptions, RejectOptions, ReviewOptions, UploadOptions } from "./types.ts";
+import type { CollectOptions, GrepOptions, InitOptions, ListOptions, NormalizeOptions, RejectOptions, ReviewOptions, UploadOptions } from "./types.ts";
 import { loadDenyPatterns } from "./review.ts";
 
 export function printUsage(): void {
   console.log(`
-pi-share-hf
+agent-trace-hub
 
 Usage:
-  pi-share-hf init --cwd <dir> --repo <hf-dataset-repo> --workspace <dir> [options]
-  pi-share-hf collect [--workspace <dir>] [options] [context-file...]
-  pi-share-hf review [--workspace <dir>] [options] [context-file...]
-  pi-share-hf upload [--workspace <dir>]
-  pi-share-hf reject [--workspace <dir>] <image-or-session>
-  pi-share-hf list [--workspace <dir>] --uploadable
-  pi-share-hf grep [--workspace <dir>] [--ignore-case] <pattern>
+  agent-trace-hub init --cwd <dir> --repo <hf-dataset-repo> --workspace <dir> [options]
+  agent-trace-hub collect [--workspace <dir>] [options] [context-file...]
+  agent-trace-hub review [--workspace <dir>] [options] [context-file...]
+  agent-trace-hub upload [--workspace <dir>]
+  agent-trace-hub reject [--workspace <dir>] <image-or-session>
+  agent-trace-hub list [--workspace <dir>] --uploadable
+  agent-trace-hub grep [--workspace <dir>] [--ignore-case] <pattern>
+  agent-trace-hub normalize --source pi --input <file.jsonl> --output <file.jsonl> [options]
 
 Commands:
   init      Create a workspace and store cwd/repo configuration
@@ -24,6 +25,7 @@ Commands:
   reject    Add a session to workspace/reject.txt so upload always skips it
   list      List sessions matching built-in filters
   grep      Ripgrep only the uploadable session set
+  normalize Convert a supported raw/redacted agent trace into agent_trace_v1
 
 Init options:
   --cwd <dir>            Working directory whose pi sessions should be collected (default: .)
@@ -71,6 +73,13 @@ Grep options:
   --workspace <dir>      Existing workspace (default: .pi/hf-sessions)
   --ignore-case, -i      Case-insensitive search
   <pattern>              Ripgrep pattern to run against uploadable sessions
+
+Normalize options:
+  --source <source>       Input source format. Currently: pi
+  --input <file>          Source session JSONL
+  --output <file>         Output canonical agent_trace_v1 JSONL
+  --agent <name>          Source agent label (default: pi)
+  --model <id>            Source model id if known
 `);
 }
 
@@ -238,6 +247,29 @@ export function parseGrepArgs(args: string[]): GrepOptions {
   }
 
   return { workspace, pattern, ignoreCase };
+}
+
+export function parseNormalizeArgs(args: string[]): NormalizeOptions {
+  let source = "";
+  let input = "";
+  let output = "";
+  let agent: string | undefined;
+  let model: string | undefined;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--source") source = requireValue(args, ++i, "--source");
+    else if (arg === "--input") input = path.resolve(requireValue(args, ++i, "--input"));
+    else if (arg === "--output") output = path.resolve(requireValue(args, ++i, "--output"));
+    else if (arg === "--agent") agent = requireValue(args, ++i, "--agent");
+    else if (arg === "--model") model = requireValue(args, ++i, "--model");
+    else throw new Error(`Unknown normalize option: ${arg}`);
+  }
+
+  if (source !== "pi") throw new Error("normalize requires --source pi");
+  if (!input) throw new Error("normalize requires --input");
+  if (!output) throw new Error("normalize requires --output");
+  return { source, input, output, agent, model };
 }
 
 function requireValue(args: string[], index: number, flag: string): string {

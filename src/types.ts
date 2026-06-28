@@ -93,6 +93,16 @@ export interface GrepOptions {
   ignoreCase: boolean;
 }
 
+export type NormalizeSource = "pi";
+
+export interface NormalizeOptions {
+  source: NormalizeSource;
+  input: string;
+  output: string;
+  agent?: string;
+  model?: string;
+}
+
 export interface Finding {
   detector: DetectorName;
   severity: Severity;

@@ -1,15 +1,18 @@
 {
-  "name": "pi-share-hf",
-  "version": "0.5.0",
+  "name": "agent-trace-hub",
+  "version": "0.1.0",
   "type": "module",
-  "bin": "dist/index.js",
+  "bin": {
+    "agent-trace-hub": "dist/index.js",
+    "ath": "dist/index.js"
+  },
   "files": [
     "dist",
     "README.md"
   ],
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && node scripts/fix-shebang.mjs && chmod +x dist/index.js",
-    "check": "tsgo --noEmit && node --experimental-strip-types src/index.ts --help >/dev/null && node --experimental-strip-types src/index.ts init --help >/dev/null && node --experimental-strip-types src/index.ts collect --help >/dev/null && node --experimental-strip-types src/index.ts review --help >/dev/null && node --experimental-strip-types src/index.ts upload --help >/dev/null && node --experimental-strip-types src/index.ts reject --help >/dev/null && node --experimental-strip-types src/index.ts list --help >/dev/null && node --experimental-strip-types src/index.ts grep --help >/dev/null"
+    "check": "tsgo --noEmit && node --experimental-strip-types src/index.ts --help >/dev/null && node --experimental-strip-types src/index.ts init --help >/dev/null && node --experimental-strip-types src/index.ts collect --help >/dev/null && node --experimental-strip-types src/index.ts review --help >/dev/null && node --experimental-strip-types src/index.ts upload --help >/dev/null && node --experimental-strip-types src/index.ts reject --help >/dev/null && node --experimental-strip-types src/index.ts list --help >/dev/null && node --experimental-strip-types src/index.ts grep --help >/dev/null && node --experimental-strip-types src/index.ts normalize --help >/dev/null"
   },
   "dependencies": {
     "@huggingface/hub": "^2.11.0"
