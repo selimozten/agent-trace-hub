@@ -9,14 +9,38 @@ const DEFAULT_DATASET_NAME = "agent-trace-hub canonical traces";
 const DEFAULT_LICENSE = "other";
 
 export async function runRelease(options: ReleaseOptions): Promise<void> {
-  if (options.auditReport) loadPassingAuditReport(options.auditReport);
-  if (options.approvalReport) loadApprovalReport(options.approvalReport);
+  validateReleaseGates(options);
   const dataset = await buildReleaseDataset(options);
   writeReleaseDataset(options, dataset);
   console.log(`Wrote canonical dataset release: ${options.outputDir}`);
   console.log(`Shards: ${dataset.info.shard_count}`);
   console.log(`Traces: ${dataset.info.trace_count}`);
   console.log(`Messages: ${dataset.info.message_count}`);
+}
+
+function validateReleaseGates(options: ReleaseOptions): void {
+  const releaseInput = singleGatedInput(options);
+  if (options.auditReport) {
+    const audit = loadPassingAuditReport(options.auditReport);
+    if (audit.input !== releaseInput) {
+      throw new Error(`Audit report input does not match release input: ${audit.input} !== ${releaseInput}`);
+    }
+  }
+
+  if (options.approvalReport) {
+    const approval = loadApprovalReport(options.approvalReport);
+    if (approval.audit_input !== releaseInput) {
+      throw new Error(`Approval report audit input does not match release input: ${approval.audit_input} !== ${releaseInput}`);
+    }
+  }
+}
+
+function singleGatedInput(options: ReleaseOptions): string {
+  if (!options.auditReport && !options.approvalReport) return options.inputs[0] ?? "";
+  if (options.inputs.length !== 1) {
+    throw new Error("release gates currently require exactly one --input per audit/approval report");
+  }
+  return options.inputs[0];
 }
 
 interface ReleaseDataset {

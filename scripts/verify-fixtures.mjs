@@ -227,6 +227,9 @@ assert(releaseInfo.trace_count === 12, "release dataset trace count mismatch");
 assert(releaseInfo.source_agents.codex === 1, "release source agent counts missing codex");
 assertCommandFails([...nodeArgs, "release", "--input", "examples/all.agent_trace_v1.jsonl", "--output-dir", releaseDir], "release should refuse non-empty output without --force");
 assertCommandFails([...nodeArgs, "release", "--input", dirtyCanonical, "--output-dir", path.join(root, "examples/.tmp-release-dirty"), "--audit-report", dirtyAuditReport], "release should reject failing audit reports");
+assertCommandFails([...nodeArgs, "release", "--input", dirtyCanonical, "--output-dir", path.join(root, "examples/.tmp-release-mismatched-audit"), "--audit-report", cleanAuditReport], "release should reject audit reports for a different input");
+assertCommandFails([...nodeArgs, "release", "--input", dirtyCanonical, "--output-dir", path.join(root, "examples/.tmp-release-mismatched-approval"), "--approval-report", approvalReport], "release should reject approval reports for a different input");
+assertCommandFails([...nodeArgs, "release", "--input", "examples/all.agent_trace_v1.jsonl", "--input", "examples/codex-session.agent_trace_v1.jsonl", "--output-dir", path.join(root, "examples/.tmp-release-multi-gated"), "--audit-report", cleanAuditReport], "release should reject gated multi-input releases");
 
 assertJsonl("examples/codex-session.agent_trace_v1.jsonl", (trace) => {
   assert(trace.schema === "agent_trace_v1", "schema mismatch");
@@ -279,6 +282,9 @@ fs.rmSync(discoverOutput, { force: true });
 fs.rmSync(discoverRoot, { recursive: true, force: true });
 fs.rmSync(releaseDir, { recursive: true, force: true });
 fs.rmSync(path.join(root, "examples/.tmp-release-dirty"), { recursive: true, force: true });
+fs.rmSync(path.join(root, "examples/.tmp-release-mismatched-audit"), { recursive: true, force: true });
+fs.rmSync(path.join(root, "examples/.tmp-release-mismatched-approval"), { recursive: true, force: true });
+fs.rmSync(path.join(root, "examples/.tmp-release-multi-gated"), { recursive: true, force: true });
 fs.rmSync(tmpRawDir, { recursive: true, force: true });
 console.log("fixture verification passed");
 

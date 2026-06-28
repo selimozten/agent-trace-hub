@@ -148,7 +148,7 @@ agent-trace-hub release \
   --license other
 ```
 
-The release directory contains `data/*.agent_trace_v1.jsonl`, `manifest.jsonl`, `dataset_info.json`, `README.md`, and the canonical schema. It validates input structure and records file hashes/counts. Deterministic audit and human approval become release gates when `--audit-report` and `--approval-report` are supplied.
+The release directory contains `data/*.agent_trace_v1.jsonl`, `manifest.jsonl`, `dataset_info.json`, `README.md`, and the canonical schema. It validates input structure and records file hashes/counts. Deterministic audit and human approval become release gates when `--audit-report` and `--approval-report` are supplied; gated releases currently require the report input to match the single released shard exactly.
 
 Render for training:
 
