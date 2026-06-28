@@ -134,10 +134,14 @@ Each output JSONL line is one complete session:
 }
 ```
 
+JSON Schema:
+
+[schema/agent_trace_v1.schema.json](schema/agent_trace_v1.schema.json)
+
 ## Development
 
 ```bash
-npm install
+npm ci
 npm run check
 npm test
 npm run build
