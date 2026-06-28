@@ -1,6 +1,6 @@
 import os from "node:os";
 import path from "node:path";
-import type { CollectOptions, DiscoverOptions, GrepOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, ReleaseOptions, RenderOptions, ReviewOptions, UploadOptions, ValidateOptions } from "./types.ts";
+import type { AuditOptions, CollectOptions, DiscoverOptions, GrepOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, ReleaseOptions, RenderOptions, ReviewOptions, UploadOptions, ValidateOptions } from "./types.ts";
 import { loadDenyPatterns } from "./review.ts";
 
 export function printUsage(): void {
@@ -19,6 +19,7 @@ Usage:
   agent-trace-hub normalize --source <source> --input <file.jsonl> --output <file.jsonl> [options]
   agent-trace-hub normalize-dir --source <source> --input-dir <dir> --output <file.jsonl> [options]
   agent-trace-hub validate --input <file.jsonl>
+  agent-trace-hub audit --input <file.jsonl> [--output <file.json>] [options]
   agent-trace-hub render --format <format> --input <file.jsonl> --output <file.jsonl>
   agent-trace-hub release --input <file.jsonl>... --output-dir <dir> [options]
 
@@ -34,6 +35,7 @@ Commands:
   normalize Convert a supported raw/redacted agent trace into agent_trace_v1
   normalize-dir Convert a directory of JSONL traces into one canonical agent_trace_v1 JSONL
   validate  Validate canonical agent_trace_v1 JSONL
+  audit     Audit canonical traces for deterministic release blockers
   render    Render canonical traces into model-specific training formats
   release   Build a local publishable canonical dataset directory
 
@@ -100,6 +102,14 @@ Normalize options:
 Validate options:
   --input <file>          Canonical agent_trace_v1 JSONL
 
+Audit options:
+  --input <file>          Canonical agent_trace_v1 JSONL
+  --output <file.json>    Write audit report JSON
+  --env-file <path>       Secret source file (default: ~/.zshrc)
+  --secret <file>|<text>  Additional literal secret or line-based secret file (repeatable)
+  --deny <file>|<regex>   Deny pattern: file with one regex per line, or a regex string (repeatable)
+  --fail-on <mode>        any, blocking, or never (default: blocking)
+
 Render options:
   --format <format>       Target format: openai-chat, anthropic-messages, chatml, sharegpt, sft-text, ornith-qwen-xml
   --input <file>          Canonical agent_trace_v1 JSONL
@@ -108,6 +118,7 @@ Render options:
 Release options:
   --input <file>          Canonical agent_trace_v1 JSONL shard (repeatable)
   --output-dir <dir>      Output dataset directory
+  --audit-report <file>   Require a passing agent_trace_audit_v1 report
   --name <name>           Dataset display name (default: agent-trace-hub canonical traces)
   --license <id>          Dataset license id/string (default: other)
   --force                 Replace an existing non-empty output directory
@@ -366,6 +377,34 @@ export function parseValidateArgs(args: string[]): ValidateOptions {
   return { input };
 }
 
+export function parseAuditArgs(args: string[]): AuditOptions {
+  let input = "";
+  let output: string | undefined;
+  let envFile = path.join(os.homedir(), ".zshrc");
+  const secrets: string[] = [];
+  const denyInputs: string[] = [];
+  let failOn: AuditOptions["failOn"] = "blocking";
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--input") input = path.resolve(requireValue(args, ++i, "--input"));
+    else if (arg === "--output") output = path.resolve(requireValue(args, ++i, "--output"));
+    else if (arg === "--env-file") envFile = path.resolve(requireValue(args, ++i, "--env-file"));
+    else if (arg === "--secret") secrets.push(requireValue(args, ++i, "--secret"));
+    else if (arg === "--deny") denyInputs.push(requireValue(args, ++i, "--deny"));
+    else if (arg === "--fail-on") {
+      const value = requireValue(args, ++i, "--fail-on");
+      if (value !== "any" && value !== "blocking" && value !== "never") {
+        throw new Error("audit --fail-on must be one of: any, blocking, never");
+      }
+      failOn = value;
+    } else throw new Error(`Unknown audit option: ${arg}`);
+  }
+
+  if (!input) throw new Error("audit requires --input");
+  return { input, output, envFile, secrets, denyPatterns: loadDenyPatterns(denyInputs), failOn };
+}
+
 export function parseRenderArgs(args: string[]): RenderOptions {
   let format = "";
   let input = "";
@@ -388,6 +427,7 @@ export function parseRenderArgs(args: string[]): RenderOptions {
 export function parseReleaseArgs(args: string[]): ReleaseOptions {
   const inputs: string[] = [];
   let outputDir = "";
+  let auditReport: string | undefined;
   let name: string | undefined;
   let license: string | undefined;
   let force = false;
@@ -396,6 +436,7 @@ export function parseReleaseArgs(args: string[]): ReleaseOptions {
     const arg = args[i];
     if (arg === "--input") inputs.push(path.resolve(requireValue(args, ++i, "--input")));
     else if (arg === "--output-dir") outputDir = path.resolve(requireValue(args, ++i, "--output-dir"));
+    else if (arg === "--audit-report") auditReport = path.resolve(requireValue(args, ++i, "--audit-report"));
     else if (arg === "--name") name = requireValue(args, ++i, "--name");
     else if (arg === "--license") license = requireValue(args, ++i, "--license");
     else if (arg === "--force") force = true;
@@ -404,7 +445,7 @@ export function parseReleaseArgs(args: string[]): ReleaseOptions {
 
   if (inputs.length === 0) throw new Error("release requires at least one --input");
   if (!outputDir) throw new Error("release requires --output-dir");
-  return { inputs, outputDir, name, license, force };
+  return { inputs, outputDir, auditReport, name, license, force };
 }
 
 function isNormalizeSource(source: string): boolean {

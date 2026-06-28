@@ -2,18 +2,30 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { readCanonicalJsonl } from "./canonical.ts";
-import type { CanonicalTrace, ReleaseDatasetInfo, ReleaseManifestEntry, ReleaseOptions } from "./types.ts";
+import { isRecord } from "./workspace.ts";
+import type { AuditReport, CanonicalTrace, ReleaseDatasetInfo, ReleaseManifestEntry, ReleaseOptions } from "./types.ts";
 
 const DEFAULT_DATASET_NAME = "agent-trace-hub canonical traces";
 const DEFAULT_LICENSE = "other";
 
 export async function runRelease(options: ReleaseOptions): Promise<void> {
+  if (options.auditReport) validateAuditReport(options.auditReport);
   const dataset = await buildReleaseDataset(options);
   writeReleaseDataset(options, dataset);
   console.log(`Wrote canonical dataset release: ${options.outputDir}`);
   console.log(`Shards: ${dataset.info.shard_count}`);
   console.log(`Traces: ${dataset.info.trace_count}`);
   console.log(`Messages: ${dataset.info.message_count}`);
+}
+
+function validateAuditReport(reportPath: string): void {
+  const parsed = JSON.parse(fs.readFileSync(reportPath, "utf-8")) as unknown;
+  if (!isRecord(parsed)) throw new Error(`Invalid audit report: ${reportPath}`);
+  const report = parsed as unknown as AuditReport;
+  if (report.schema !== "agent_trace_audit_v1") throw new Error(`Invalid audit report schema: ${reportPath}`);
+  if (report.status !== "pass" || report.blocking_finding_count !== 0) {
+    throw new Error(`Refusing release: audit report did not pass (${report.blocking_finding_count} blocking finding(s))`);
+  }
 }
 
 interface ReleaseDataset {

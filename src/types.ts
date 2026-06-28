@@ -150,9 +150,40 @@ export interface ValidateOptions {
   input: string;
 }
 
+export interface AuditOptions {
+  input: string;
+  output?: string;
+  envFile: string;
+  secrets: string[];
+  denyPatterns: RegExp[];
+  failOn: "any" | "blocking" | "never";
+}
+
+export interface AuditFinding {
+  severity: Severity;
+  detector: "literal-secret" | "deny-pattern" | "credential-pattern" | "image";
+  jsonPath: string;
+  detail: string;
+  evidence: string;
+  blocking: boolean;
+}
+
+export interface AuditReport {
+  input: string;
+  schema: "agent_trace_audit_v1";
+  created_at: string;
+  trace_count: number;
+  message_count: number;
+  finding_count: number;
+  blocking_finding_count: number;
+  findings: AuditFinding[];
+  status: "pass" | "fail";
+}
+
 export interface ReleaseOptions {
   inputs: string[];
   outputDir: string;
+  auditReport?: string;
   name?: string;
   license?: string;
   force: boolean;

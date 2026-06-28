@@ -28,6 +28,7 @@ Implemented:
 - `discover` for finding local candidate traces from common coding-agent harnesses
 - `normalize-dir` for combining a directory of trace JSONL files into one canonical JSONL shard
 - `validate` for canonical `agent_trace_v1` JSONL
+- `audit` for deterministic canonical release blockers, including known secrets, deny patterns, and common credential patterns
 - `render` for OpenAI chat, Anthropic messages, ChatML, ShareGPT, plain SFT text, and Ornith/Qwen XML training text
 - `release` for packaging validated canonical shards with manifest metadata and a dataset card
 - fixture regression test covering normalization, validation, batch normalization, rendering, auto-detection, and Codex assistant-turn coalescing
@@ -86,17 +87,30 @@ Validate canonical JSONL:
 agent-trace-hub validate --input canonical/session.agent_trace_v1.jsonl
 ```
 
+Audit a canonical shard before release:
+
+```bash
+agent-trace-hub audit \
+  --input canonical/shard-00001.agent_trace_v1.jsonl \
+  --output canonical/shard-00001.audit.json \
+  --secret secrets.txt \
+  --deny private-company-name
+```
+
+The audit command validates the canonical shard, checks known literal secrets, deny regexes, common credential patterns, and preserved image blocks, then writes an `agent_trace_audit_v1` report. It exits non-zero by default when blocking findings exist.
+
 Build a local canonical dataset release directory:
 
 ```bash
 agent-trace-hub release \
   --input canonical/shard-00001.agent_trace_v1.jsonl \
   --output-dir release/agent-traces \
+  --audit-report canonical/shard-00001.audit.json \
   --name "my coding agent traces" \
   --license other
 ```
 
-The release directory contains `data/*.agent_trace_v1.jsonl`, `manifest.jsonl`, `dataset_info.json`, and `README.md`. It validates input structure and records file hashes/counts; it does not replace redaction or human/LLM review.
+The release directory contains `data/*.agent_trace_v1.jsonl`, `manifest.jsonl`, `dataset_info.json`, `README.md`, and the canonical schema. It validates input structure and records file hashes/counts. Deterministic audit is a release gate when `--audit-report` is supplied; it still does not replace deeper human/LLM review for public releases.
 
 Render for training:
 
@@ -182,6 +196,7 @@ npm run build
 - Pi, Claude Code, Codex, Cursor, Aider, Markdown transcript, OpenAI-chat, and Anthropic-message normalization
 - local trace discovery for supported harness directories
 - canonical schema validation
+- deterministic canonical audit pass/fail behavior and release gating
 - canonical release packaging, manifest counts, and overwrite protection
 - all supported render formats
 - batch `normalize-dir`

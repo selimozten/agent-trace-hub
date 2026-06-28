@@ -80,6 +80,30 @@ const cursorOnly = execFileSync(process.execPath, [...nodeArgs, "discover", "--r
   .map((line) => JSON.parse(line));
 assert(cursorOnly.length === 1 && cursorOnly[0].source === "cursor", "discover --source cursor should only return cursor");
 
+const cleanAuditReport = path.join(root, "examples/.tmp-audit-clean.json");
+run([...nodeArgs, "audit", "--input", "examples/all.agent_trace_v1.jsonl", "--output", cleanAuditReport]);
+const cleanAudit = JSON.parse(fs.readFileSync(cleanAuditReport, "utf-8"));
+assert(cleanAudit.schema === "agent_trace_audit_v1", "audit schema mismatch");
+assert(cleanAudit.status === "pass", "clean audit should pass");
+assert(cleanAudit.trace_count === 11, "clean audit trace count mismatch");
+
+const dirtyCanonical = path.join(root, "examples/.tmp-dirty.agent_trace_v1.jsonl");
+const dirtyAuditReport = path.join(root, "examples/.tmp-audit-dirty.json");
+fs.writeFileSync(dirtyCanonical, `${JSON.stringify({
+  schema: "agent_trace_v1",
+  session_id: "dirty",
+  source: { agent: "fixture", source_format: "fixture" },
+  metadata: {},
+  tools: [],
+  messages: [{ role: "user", content: [{ type: "text", text: "use sk-1234567890abcdefghijklmnopqrstuv for this request" }] }],
+  outcome: { quality: "unlabeled" },
+})}\n`);
+run([...nodeArgs, "audit", "--input", dirtyCanonical, "--output", dirtyAuditReport, "--fail-on", "never"]);
+const dirtyAudit = JSON.parse(fs.readFileSync(dirtyAuditReport, "utf-8"));
+assert(dirtyAudit.status === "fail", "dirty audit should fail");
+assert(dirtyAudit.blocking_finding_count > 0, "dirty audit should report blocking findings");
+assertCommandFails([...nodeArgs, "audit", "--input", dirtyCanonical], "audit should fail by default on blocking findings");
+
 const releaseDir = path.join(root, "examples/.tmp-release");
 fs.rmSync(releaseDir, { recursive: true, force: true });
 run([
@@ -89,6 +113,8 @@ run([
   "examples/all.agent_trace_v1.jsonl",
   "--output-dir",
   releaseDir,
+  "--audit-report",
+  cleanAuditReport,
   "--name",
   "fixture canonical traces",
   "--license",
@@ -106,6 +132,7 @@ assert(releaseInfo.name === "fixture canonical traces", "release dataset name mi
 assert(releaseInfo.trace_count === 11, "release dataset trace count mismatch");
 assert(releaseInfo.source_agents.codex === 1, "release source agent counts missing codex");
 assertCommandFails([...nodeArgs, "release", "--input", "examples/all.agent_trace_v1.jsonl", "--output-dir", releaseDir], "release should refuse non-empty output without --force");
+assertCommandFails([...nodeArgs, "release", "--input", dirtyCanonical, "--output-dir", path.join(root, "examples/.tmp-release-dirty"), "--audit-report", dirtyAuditReport], "release should reject failing audit reports");
 
 assertJsonl("examples/codex-session.agent_trace_v1.jsonl", (trace) => {
   assert(trace.schema === "agent_trace_v1", "schema mismatch");
@@ -124,9 +151,13 @@ fs.rmSync(path.join(root, "examples/codex-session.auto.agent_trace_v1.jsonl"), {
 fs.rmSync(path.join(root, "examples/anthropic-messages-session.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(path.join(root, "examples/cursor-session.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(path.join(root, "examples/aider-history.auto.agent_trace_v1.jsonl"), { force: true });
+fs.rmSync(cleanAuditReport, { force: true });
+fs.rmSync(dirtyAuditReport, { force: true });
+fs.rmSync(dirtyCanonical, { force: true });
 fs.rmSync(discoverOutput, { force: true });
 fs.rmSync(discoverRoot, { recursive: true, force: true });
 fs.rmSync(releaseDir, { recursive: true, force: true });
+fs.rmSync(path.join(root, "examples/.tmp-release-dirty"), { recursive: true, force: true });
 fs.rmSync(tmpRawDir, { recursive: true, force: true });
 console.log("fixture verification passed");
 
