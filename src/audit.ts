@@ -52,7 +52,7 @@ export async function auditCanonical(options: AuditOptions): Promise<AuditReport
   const findings: AuditFinding[] = [];
 
   for (const [traceIndex, trace] of traces.entries()) {
-    findings.push(...auditTrace(trace, traceIndex, literalSecrets, options.denyPatterns));
+    findings.push(...auditTrace(trace, traceIndex, literalSecrets, options.denyPatterns, options.profile));
   }
 
   const blockingFindingCount = findings.filter((finding) => finding.blocking).length;
@@ -60,6 +60,7 @@ export async function auditCanonical(options: AuditOptions): Promise<AuditReport
     input: options.input,
     schema: "agent_trace_audit_v1",
     created_at: new Date().toISOString(),
+    profile: options.profile,
     trace_count: traces.length,
     message_count: traces.reduce((sum, trace) => sum + trace.messages.length, 0),
     finding_count: findings.length,
@@ -74,6 +75,7 @@ function auditTrace(
   traceIndex: number,
   literalSecrets: Array<{ name: string; value: string; replacement: string }>,
   denyPatterns: RegExp[],
+  profile: AuditOptions["profile"],
 ): AuditFinding[] {
   const findings: AuditFinding[] = [];
   visitJson(trace as unknown as JsonObject, `$[${traceIndex}]`, (value, jsonPath) => {
@@ -84,13 +86,14 @@ function auditTrace(
   for (const [messageIndex, message] of trace.messages.entries()) {
     for (const [blockIndex, block] of (message.content ?? []).entries()) {
       if (block.type === "image") {
+        const blocking = profile === "public";
         findings.push({
-          severity: "medium",
+          severity: blocking ? "high" : "medium",
           detector: "image",
           jsonPath: `$[${traceIndex}].messages[${messageIndex}].content[${blockIndex}]`,
-          detail: block.mime_type ?? "image",
+          detail: blocking ? "image block disallowed by public audit profile" : block.mime_type ?? "image",
           evidence: "[image block]",
-          blocking: false,
+          blocking,
         });
       }
     }

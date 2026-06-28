@@ -185,6 +185,7 @@ export interface AuditOptions {
   secrets: string[];
   denyPatterns: RegExp[];
   failOn: "any" | "blocking" | "never";
+  profile: "local" | "private" | "public";
 }
 
 export interface AuditFinding {
@@ -200,6 +201,7 @@ export interface AuditReport {
   input: string;
   schema: "agent_trace_audit_v1";
   created_at: string;
+  profile: "local" | "private" | "public";
   trace_count: number;
   message_count: number;
   finding_count: number;

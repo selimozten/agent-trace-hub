@@ -4,11 +4,12 @@
   "title": "Agent Trace Audit V1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["input", "schema", "created_at", "trace_count", "message_count", "finding_count", "blocking_finding_count", "findings", "status"],
+  "required": ["input", "schema", "created_at", "profile", "trace_count", "message_count", "finding_count", "blocking_finding_count", "findings", "status"],
   "properties": {
     "input": { "type": "string", "minLength": 1 },
     "schema": { "const": "agent_trace_audit_v1" },
     "created_at": { "type": "string", "minLength": 1 },
+    "profile": { "enum": ["local", "private", "public"] },
     "trace_count": { "type": "integer", "minimum": 0 },
     "message_count": { "type": "integer", "minimum": 0 },
     "finding_count": { "type": "integer", "minimum": 0 },

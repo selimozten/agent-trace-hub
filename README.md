@@ -32,6 +32,7 @@ Implemented:
 - `normalize-dir` for combining a directory of trace JSONL files into one canonical JSONL shard
 - `validate` for canonical `agent_trace_v1` JSONL
 - `audit` for deterministic canonical release blockers, including known secrets, deny patterns, and common credential patterns
+- audit profiles for local, private, and public release policies
 - `approve` for explicit human approval artifacts tied to passing audit reports
 - `render` for OpenAI chat, Anthropic messages, ChatML, ShareGPT, plain SFT text, and Ornith/Qwen XML training text
 - `release` for packaging validated canonical shards with manifest metadata and a dataset card
@@ -116,11 +117,12 @@ Audit a canonical shard before release:
 agent-trace-hub audit \
   --input canonical/shard-00001.agent_trace_v1.jsonl \
   --output canonical/shard-00001.audit.json \
+  --profile public \
   --secret secrets.txt \
   --deny private-company-name
 ```
 
-The audit command validates the canonical shard, checks known literal secrets, deny regexes, common credential patterns, and preserved image blocks, then writes an `agent_trace_audit_v1` report. It exits non-zero by default when blocking findings exist.
+The audit command validates the canonical shard, checks known literal secrets, deny regexes, common credential patterns, and preserved image blocks, then writes an `agent_trace_audit_v1` report. It exits non-zero by default when blocking findings exist. `--profile private` is the default; `--profile public` treats preserved image blocks as blocking release findings.
 
 Create a human approval artifact:
 

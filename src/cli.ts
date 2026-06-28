@@ -121,6 +121,7 @@ Validate artifact options:
 Audit options:
   --input <file>          Canonical agent_trace_v1 JSONL
   --output <file.json>    Write audit report JSON
+  --profile <mode>        local, private, or public release policy (default: private)
   --env-file <path>       Secret source file (default: ~/.zshrc)
   --secret <file>|<text>  Additional literal secret or line-based secret file (repeatable)
   --deny <file>|<regex>   Deny pattern: file with one regex per line, or a regex string (repeatable)
@@ -443,6 +444,7 @@ export function parseAuditArgs(args: string[]): AuditOptions {
   const secrets: string[] = [];
   const denyInputs: string[] = [];
   let failOn: AuditOptions["failOn"] = "blocking";
+  let profile: AuditOptions["profile"] = "private";
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -451,6 +453,11 @@ export function parseAuditArgs(args: string[]): AuditOptions {
     else if (arg === "--env-file") envFile = path.resolve(requireValue(args, ++i, "--env-file"));
     else if (arg === "--secret") secrets.push(requireValue(args, ++i, "--secret"));
     else if (arg === "--deny") denyInputs.push(requireValue(args, ++i, "--deny"));
+    else if (arg === "--profile") {
+      const value = requireValue(args, ++i, "--profile");
+      if (!isAuditProfile(value)) throw new Error("audit --profile must be one of: local, private, public");
+      profile = value;
+    }
     else if (arg === "--fail-on") {
       const value = requireValue(args, ++i, "--fail-on");
       if (value !== "any" && value !== "blocking" && value !== "never") {
@@ -461,7 +468,7 @@ export function parseAuditArgs(args: string[]): AuditOptions {
   }
 
   if (!input) throw new Error("audit requires --input");
-  return { input, output, envFile, secrets, denyPatterns: loadDenyPatterns(denyInputs), failOn };
+  return { input, output, envFile, secrets, denyPatterns: loadDenyPatterns(denyInputs), failOn, profile };
 }
 
 export function parseApproveArgs(args: string[]): ApproveOptions {
@@ -532,6 +539,10 @@ export function parseReleaseArgs(args: string[]): ReleaseOptions {
 
 function isNormalizeSource(source: string): boolean {
   return ["auto", "pi", "claude-code", "codex", "cursor", "opencode", "continue", "goose", "openai-chat", "anthropic-messages", "generic-json", "markdown-transcript", "aider"].includes(source);
+}
+
+function isAuditProfile(value: string): value is AuditOptions["profile"] {
+  return value === "local" || value === "private" || value === "public";
 }
 
 function normalizeSourceList(): string {

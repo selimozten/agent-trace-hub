@@ -128,6 +128,7 @@ run([...nodeArgs, "validate-artifact", "--kind", "audit", "--input", cleanAuditR
 assertInvalidArtifact("audit", { schema: "agent_trace_audit_v1", input: "x", created_at: "now", trace_count: 1 });
 const cleanAudit = JSON.parse(fs.readFileSync(cleanAuditReport, "utf-8"));
 assert(cleanAudit.schema === "agent_trace_audit_v1", "audit schema mismatch");
+assert(cleanAudit.profile === "private", "audit default profile mismatch");
 assert(cleanAudit.status === "pass", "clean audit should pass");
 assert(cleanAudit.trace_count === 12, "clean audit trace count mismatch");
 const approvalReport = path.join(root, "examples/.tmp-approval.json");
@@ -157,6 +158,31 @@ assert(dirtyAudit.status === "fail", "dirty audit should fail");
 assert(dirtyAudit.blocking_finding_count > 0, "dirty audit should report blocking findings");
 assertCommandFails([...nodeArgs, "audit", "--input", dirtyCanonical], "audit should fail by default on blocking findings");
 assertCommandFails([...nodeArgs, "approve", "--audit-report", dirtyAuditReport, "--output", path.join(root, "examples/.tmp-dirty-approval.json"), "--reviewer", "fixture-reviewer"], "approve should reject failing audit reports");
+
+const imageCanonical = path.join(root, "examples/.tmp-image.agent_trace_v1.jsonl");
+const imagePrivateAuditReport = path.join(root, "examples/.tmp-audit-image-private.json");
+const imagePublicAuditReport = path.join(root, "examples/.tmp-audit-image-public.json");
+fs.writeFileSync(imageCanonical, `${JSON.stringify({
+  schema: "agent_trace_v1",
+  session_id: "image",
+  source: { agent: "fixture", source_format: "fixture" },
+  metadata: {},
+  tools: [],
+  messages: [{ role: "user", content: [{ type: "image", mime_type: "image/png", data: "iVBORw0KGgo=" }] }],
+  outcome: { quality: "unlabeled" },
+})}\n`);
+run([...nodeArgs, "audit", "--input", imageCanonical, "--output", imagePrivateAuditReport]);
+run([...nodeArgs, "validate-artifact", "--kind", "audit", "--input", imagePrivateAuditReport]);
+const imagePrivateAudit = JSON.parse(fs.readFileSync(imagePrivateAuditReport, "utf-8"));
+assert(imagePrivateAudit.profile === "private", "image private audit profile mismatch");
+assert(imagePrivateAudit.status === "pass", "private profile should allow image findings as nonblocking");
+assert(imagePrivateAudit.finding_count === 1 && imagePrivateAudit.blocking_finding_count === 0, "private image audit counts mismatch");
+assertCommandFails([...nodeArgs, "audit", "--profile", "public", "--input", imageCanonical, "--output", imagePublicAuditReport], "public audit should fail on image blocks");
+run([...nodeArgs, "validate-artifact", "--kind", "audit", "--input", imagePublicAuditReport]);
+const imagePublicAudit = JSON.parse(fs.readFileSync(imagePublicAuditReport, "utf-8"));
+assert(imagePublicAudit.profile === "public", "image public audit profile mismatch");
+assert(imagePublicAudit.status === "fail", "public profile should fail on image findings");
+assert(imagePublicAudit.blocking_finding_count === 1, "public image audit should report blocking finding");
 
 const releaseDir = path.join(root, "examples/.tmp-release");
 fs.rmSync(releaseDir, { recursive: true, force: true });
@@ -238,6 +264,9 @@ fs.rmSync(approvalReport, { force: true });
 fs.rmSync(dirtyAuditReport, { force: true });
 fs.rmSync(dirtyCanonical, { force: true });
 fs.rmSync(path.join(root, "examples/.tmp-dirty-approval.json"), { force: true });
+fs.rmSync(imageCanonical, { force: true });
+fs.rmSync(imagePrivateAuditReport, { force: true });
+fs.rmSync(imagePublicAuditReport, { force: true });
 fs.rmSync(discoverOutput, { force: true });
 fs.rmSync(discoverRoot, { recursive: true, force: true });
 fs.rmSync(releaseDir, { recursive: true, force: true });
