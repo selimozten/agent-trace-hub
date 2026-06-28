@@ -93,7 +93,7 @@ export interface GrepOptions {
   ignoreCase: boolean;
 }
 
-export type NormalizeSource = "pi";
+export type NormalizeSource = "auto" | "pi" | "claude-code" | "codex";
 
 export interface NormalizeOptions {
   source: NormalizeSource;
@@ -101,6 +101,57 @@ export interface NormalizeOptions {
   output: string;
   agent?: string;
   model?: string;
+}
+
+export type RenderFormat = "openai-chat" | "ornith-qwen-xml";
+
+export interface RenderOptions {
+  format: RenderFormat;
+  input: string;
+  output: string;
+}
+
+export interface ValidateOptions {
+  input: string;
+}
+
+export type CanonicalContentBlock =
+  | { type: "text"; text: string }
+  | { type: "image"; mime_type?: string; data?: string };
+
+export interface CanonicalToolCall {
+  id: string;
+  name: string;
+  arguments: JsonObject;
+}
+
+export interface CanonicalMessage {
+  role: "system" | "developer" | "user" | "assistant" | "tool";
+  content?: CanonicalContentBlock[];
+  reasoning?: CanonicalContentBlock[];
+  tool_calls?: CanonicalToolCall[];
+  tool_call_id?: string;
+  name?: string;
+  metadata?: JsonObject;
+}
+
+export interface CanonicalTrace {
+  schema: "agent_trace_v1";
+  session_id: string;
+  source: {
+    agent: string;
+    model?: string;
+    provider?: string;
+    exported_at?: string;
+    cwd?: string;
+    source_format: string;
+  };
+  metadata: JsonObject;
+  tools: JsonObject[];
+  messages: CanonicalMessage[];
+  outcome: {
+    quality: "unlabeled";
+  };
 }
 
 export interface Finding {

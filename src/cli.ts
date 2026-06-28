@@ -1,6 +1,6 @@
 import os from "node:os";
 import path from "node:path";
-import type { CollectOptions, GrepOptions, InitOptions, ListOptions, NormalizeOptions, RejectOptions, ReviewOptions, UploadOptions } from "./types.ts";
+import type { CollectOptions, GrepOptions, InitOptions, ListOptions, NormalizeOptions, RejectOptions, RenderOptions, ReviewOptions, UploadOptions, ValidateOptions } from "./types.ts";
 import { loadDenyPatterns } from "./review.ts";
 
 export function printUsage(): void {
@@ -15,7 +15,9 @@ Usage:
   agent-trace-hub reject [--workspace <dir>] <image-or-session>
   agent-trace-hub list [--workspace <dir>] --uploadable
   agent-trace-hub grep [--workspace <dir>] [--ignore-case] <pattern>
-  agent-trace-hub normalize --source pi --input <file.jsonl> --output <file.jsonl> [options]
+  agent-trace-hub normalize --source <source> --input <file.jsonl> --output <file.jsonl> [options]
+  agent-trace-hub validate --input <file.jsonl>
+  agent-trace-hub render --format <format> --input <file.jsonl> --output <file.jsonl>
 
 Commands:
   init      Create a workspace and store cwd/repo configuration
@@ -26,6 +28,8 @@ Commands:
   list      List sessions matching built-in filters
   grep      Ripgrep only the uploadable session set
   normalize Convert a supported raw/redacted agent trace into agent_trace_v1
+  validate  Validate canonical agent_trace_v1 JSONL
+  render    Render canonical traces into model-specific training formats
 
 Init options:
   --cwd <dir>            Working directory whose pi sessions should be collected (default: .)
@@ -75,11 +79,19 @@ Grep options:
   <pattern>              Ripgrep pattern to run against uploadable sessions
 
 Normalize options:
-  --source <source>       Input source format. Currently: pi
+  --source <source>       Input source format: auto, pi, claude-code, codex
   --input <file>          Source session JSONL
   --output <file>         Output canonical agent_trace_v1 JSONL
   --agent <name>          Source agent label (default: pi)
   --model <id>            Source model id if known
+
+Validate options:
+  --input <file>          Canonical agent_trace_v1 JSONL
+
+Render options:
+  --format <format>       Target format: openai-chat, ornith-qwen-xml
+  --input <file>          Canonical agent_trace_v1 JSONL
+  --output <file>         Rendered JSONL
 `);
 }
 
@@ -250,7 +262,7 @@ export function parseGrepArgs(args: string[]): GrepOptions {
 }
 
 export function parseNormalizeArgs(args: string[]): NormalizeOptions {
-  let source = "";
+  let source = "auto";
   let input = "";
   let output = "";
   let agent: string | undefined;
@@ -266,10 +278,42 @@ export function parseNormalizeArgs(args: string[]): NormalizeOptions {
     else throw new Error(`Unknown normalize option: ${arg}`);
   }
 
-  if (source !== "pi") throw new Error("normalize requires --source pi");
+  if (!["auto", "pi", "claude-code", "codex"].includes(source)) {
+    throw new Error("normalize --source must be one of: auto, pi, claude-code, codex");
+  }
   if (!input) throw new Error("normalize requires --input");
   if (!output) throw new Error("normalize requires --output");
-  return { source, input, output, agent, model };
+  return { source: source as NormalizeOptions["source"], input, output, agent, model };
+}
+
+export function parseValidateArgs(args: string[]): ValidateOptions {
+  let input = "";
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--input") input = path.resolve(requireValue(args, ++i, "--input"));
+    else throw new Error(`Unknown validate option: ${arg}`);
+  }
+  if (!input) throw new Error("validate requires --input");
+  return { input };
+}
+
+export function parseRenderArgs(args: string[]): RenderOptions {
+  let format = "";
+  let input = "";
+  let output = "";
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--format") format = requireValue(args, ++i, "--format");
+    else if (arg === "--input") input = path.resolve(requireValue(args, ++i, "--input"));
+    else if (arg === "--output") output = path.resolve(requireValue(args, ++i, "--output"));
+    else throw new Error(`Unknown render option: ${arg}`);
+  }
+  if (!["openai-chat", "ornith-qwen-xml"].includes(format)) {
+    throw new Error("render --format must be one of: openai-chat, ornith-qwen-xml");
+  }
+  if (!input) throw new Error("render requires --input");
+  if (!output) throw new Error("render requires --output");
+  return { format: format as RenderOptions["format"], input, output };
 }
 
 function requireValue(args: string[], index: number, flag: string): string {

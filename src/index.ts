@@ -1,13 +1,15 @@
 #!/usr/bin/env node --experimental-strip-types --no-warnings=ExperimentalWarning
 
-import { parseCollectArgs, parseGrepArgs, parseInitArgs, parseListArgs, parseNormalizeArgs, parseRejectArgs, parseReviewArgs, parseUploadArgs, printUsage } from "./cli.ts";
+import { parseCollectArgs, parseGrepArgs, parseInitArgs, parseListArgs, parseNormalizeArgs, parseRejectArgs, parseRenderArgs, parseReviewArgs, parseUploadArgs, parseValidateArgs, printUsage } from "./cli.ts";
 import { runCollect, runInit } from "./collect.ts";
 import { runNormalize } from "./normalize.ts";
+import { runRender } from "./render.ts";
 import { ensureStartupTools } from "./process.ts";
 import { runReject } from "./reject.ts";
 import { runReview } from "./review.ts";
 import { runUpload } from "./upload.ts";
 import { runGrep, runList } from "./query.ts";
+import { runValidate } from "./validate.ts";
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -57,6 +59,16 @@ async function main(): Promise<void> {
 
   if (command === "normalize") {
     await runNormalize(parseNormalizeArgs(args.slice(1)));
+    return;
+  }
+
+  if (command === "validate") {
+    await runValidate(parseValidateArgs(args.slice(1)));
+    return;
+  }
+
+  if (command === "render") {
+    await runRender(parseRenderArgs(args.slice(1)));
     return;
   }
 

@@ -1,0 +1,7 @@
+{"timestamp":"2026-06-28T00:00:00.000Z","type":"session_meta","payload":{"id":"example-codex-session","timestamp":"2026-06-28T00:00:00.000Z","cwd":"/redacted/project","model_provider":"openai"}}
+{"timestamp":"2026-06-28T00:00:01.000Z","type":"turn_context","payload":{"turn_id":"turn_1","cwd":"/redacted/project","model":"gpt-example"}}
+{"timestamp":"2026-06-28T00:00:02.000Z","type":"event_msg","payload":{"type":"user_message","message":"Run the tests and fix the failing assertion."}}
+{"timestamp":"2026-06-28T00:00:03.000Z","type":"response_item","payload":{"type":"reasoning","id":"rs_1","summary":[{"type":"summary_text","text":"I need to inspect the test output first."}]}}
+{"timestamp":"2026-06-28T00:00:04.000Z","type":"response_item","payload":{"type":"message","id":"msg_1","role":"assistant","content":[{"type":"output_text","text":"I will run the test suite."}]}}
+{"timestamp":"2026-06-28T00:00:05.000Z","type":"response_item","payload":{"type":"function_call","id":"fc_1","name":"shell","arguments":"{\"cmd\":\"pytest -q\"}","call_id":"call_1"}}
+{"timestamp":"2026-06-28T00:00:06.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"call_1","output":"1 failed, 12 passed"}}

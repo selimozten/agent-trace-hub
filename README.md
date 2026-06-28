@@ -19,26 +19,61 @@ This project started as a local fork of `badlogic/pi-share-hf`. The original too
 Implemented:
 
 - inherited Pi collection/review/upload workflow
-- `normalize --source pi` for converting one Pi session JSONL into canonical `agent_trace_v1`
+- `normalize` adapters for Pi, Claude Code, and Codex JSONL traces
+- `normalize --source auto` source detection
+- `validate` for canonical `agent_trace_v1` JSONL
+- `render` for OpenAI chat JSONL and Ornith/Qwen XML training text
+- fixture regression test covering normalization, validation, rendering, and Codex assistant-turn coalescing
 
 Planned:
 
-- Codex importer
-- Claude Code importer
 - dataset-level canonical export after review
-- model-family renderers
-- schema validation and release reports
+- additional source adapters for OpenCode, Aider, Cursor, Continue, Goose, and raw OpenAI/Anthropic logs
+- additional renderers for Anthropic messages, ChatML, ShareGPT, and plain SFT text
+- release reports and dataset cards for canonical public shards
 
 ## Usage
 
-Normalize a redacted Pi session:
+Normalize a trace:
 
 ```bash
 agent-trace-hub normalize \
-  --source pi \
-  --input .pi/hf-sessions/redacted/session.jsonl \
+  --source auto \
+  --input raw/session.jsonl \
   --output canonical/session.agent_trace_v1.jsonl
 ```
+
+Supported source values:
+
+- `auto`
+- `pi`
+- `claude-code`
+- `codex`
+
+Validate canonical JSONL:
+
+```bash
+agent-trace-hub validate --input canonical/session.agent_trace_v1.jsonl
+```
+
+Render for training:
+
+```bash
+agent-trace-hub render \
+  --format openai-chat \
+  --input canonical/session.agent_trace_v1.jsonl \
+  --output rendered/session.openai-chat.jsonl
+
+agent-trace-hub render \
+  --format ornith-qwen-xml \
+  --input canonical/session.agent_trace_v1.jsonl \
+  --output rendered/session.ornith-qwen-xml.jsonl
+```
+
+Supported render values:
+
+- `openai-chat`
+- `ornith-qwen-xml`
 
 The existing Pi safety workflow remains available:
 
@@ -82,6 +117,23 @@ Each output JSONL line is one complete session:
   "outcome": {"quality": "unlabeled"}
 }
 ```
+
+## Development
+
+```bash
+npm install
+npm run check
+npm test
+npm run build
+```
+
+`npm test` regenerates the examples and verifies:
+
+- Pi, Claude Code, and Codex normalization
+- canonical schema validation
+- OpenAI chat rendering
+- Ornith/Qwen XML rendering
+- Codex response-item coalescing into a single assistant turn before tool output
 
 ## Publishing Note
 
