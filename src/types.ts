@@ -180,10 +180,33 @@ export interface AuditReport {
   status: "pass" | "fail";
 }
 
+export interface ApproveOptions {
+  auditReport: string;
+  output: string;
+  reviewer: string;
+  notes?: string;
+}
+
+export interface ApprovalReport {
+  schema: "agent_trace_approval_v1";
+  created_at: string;
+  reviewer: string;
+  audit_report: string;
+  audit_input: string;
+  audit_created_at: string;
+  trace_count: number;
+  message_count: number;
+  finding_count: number;
+  blocking_finding_count: number;
+  status: "approved";
+  notes?: string;
+}
+
 export interface ReleaseOptions {
   inputs: string[];
   outputDir: string;
   auditReport?: string;
+  approvalReport?: string;
   name?: string;
   license?: string;
   force: boolean;

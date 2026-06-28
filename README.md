@@ -29,6 +29,7 @@ Implemented:
 - `normalize-dir` for combining a directory of trace JSONL files into one canonical JSONL shard
 - `validate` for canonical `agent_trace_v1` JSONL
 - `audit` for deterministic canonical release blockers, including known secrets, deny patterns, and common credential patterns
+- `approve` for explicit human approval artifacts tied to passing audit reports
 - `render` for OpenAI chat, Anthropic messages, ChatML, ShareGPT, plain SFT text, and Ornith/Qwen XML training text
 - `release` for packaging validated canonical shards with manifest metadata and a dataset card
 - fixture regression test covering normalization, validation, batch normalization, rendering, auto-detection, and Codex assistant-turn coalescing
@@ -99,6 +100,17 @@ agent-trace-hub audit \
 
 The audit command validates the canonical shard, checks known literal secrets, deny regexes, common credential patterns, and preserved image blocks, then writes an `agent_trace_audit_v1` report. It exits non-zero by default when blocking findings exist.
 
+Create a human approval artifact:
+
+```bash
+agent-trace-hub approve \
+  --audit-report canonical/shard-00001.audit.json \
+  --output canonical/shard-00001.approval.json \
+  --reviewer "@reviewer"
+```
+
+Approval requires a passing audit report and records reviewer, counts, audit input, and optional notes.
+
 Build a local canonical dataset release directory:
 
 ```bash
@@ -106,11 +118,12 @@ agent-trace-hub release \
   --input canonical/shard-00001.agent_trace_v1.jsonl \
   --output-dir release/agent-traces \
   --audit-report canonical/shard-00001.audit.json \
+  --approval-report canonical/shard-00001.approval.json \
   --name "my coding agent traces" \
   --license other
 ```
 
-The release directory contains `data/*.agent_trace_v1.jsonl`, `manifest.jsonl`, `dataset_info.json`, `README.md`, and the canonical schema. It validates input structure and records file hashes/counts. Deterministic audit is a release gate when `--audit-report` is supplied; it still does not replace deeper human/LLM review for public releases.
+The release directory contains `data/*.agent_trace_v1.jsonl`, `manifest.jsonl`, `dataset_info.json`, `README.md`, and the canonical schema. It validates input structure and records file hashes/counts. Deterministic audit and human approval become release gates when `--audit-report` and `--approval-report` are supplied.
 
 Render for training:
 
@@ -197,6 +210,7 @@ npm run build
 - local trace discovery for supported harness directories
 - canonical schema validation
 - deterministic canonical audit pass/fail behavior and release gating
+- human approval artifact generation and release gating
 - canonical release packaging, manifest counts, and overwrite protection
 - all supported render formats
 - batch `normalize-dir`

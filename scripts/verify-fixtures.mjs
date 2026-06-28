@@ -86,6 +86,12 @@ const cleanAudit = JSON.parse(fs.readFileSync(cleanAuditReport, "utf-8"));
 assert(cleanAudit.schema === "agent_trace_audit_v1", "audit schema mismatch");
 assert(cleanAudit.status === "pass", "clean audit should pass");
 assert(cleanAudit.trace_count === 11, "clean audit trace count mismatch");
+const approvalReport = path.join(root, "examples/.tmp-approval.json");
+run([...nodeArgs, "approve", "--audit-report", cleanAuditReport, "--output", approvalReport, "--reviewer", "fixture-reviewer", "--notes", "fixture approved"]);
+const approval = JSON.parse(fs.readFileSync(approvalReport, "utf-8"));
+assert(approval.schema === "agent_trace_approval_v1", "approval schema mismatch");
+assert(approval.status === "approved", "approval status mismatch");
+assert(approval.reviewer === "fixture-reviewer", "approval reviewer mismatch");
 
 const dirtyCanonical = path.join(root, "examples/.tmp-dirty.agent_trace_v1.jsonl");
 const dirtyAuditReport = path.join(root, "examples/.tmp-audit-dirty.json");
@@ -103,6 +109,7 @@ const dirtyAudit = JSON.parse(fs.readFileSync(dirtyAuditReport, "utf-8"));
 assert(dirtyAudit.status === "fail", "dirty audit should fail");
 assert(dirtyAudit.blocking_finding_count > 0, "dirty audit should report blocking findings");
 assertCommandFails([...nodeArgs, "audit", "--input", dirtyCanonical], "audit should fail by default on blocking findings");
+assertCommandFails([...nodeArgs, "approve", "--audit-report", dirtyAuditReport, "--output", path.join(root, "examples/.tmp-dirty-approval.json"), "--reviewer", "fixture-reviewer"], "approve should reject failing audit reports");
 
 const releaseDir = path.join(root, "examples/.tmp-release");
 fs.rmSync(releaseDir, { recursive: true, force: true });
@@ -115,6 +122,8 @@ run([
   releaseDir,
   "--audit-report",
   cleanAuditReport,
+  "--approval-report",
+  approvalReport,
   "--name",
   "fixture canonical traces",
   "--license",
@@ -152,8 +161,10 @@ fs.rmSync(path.join(root, "examples/anthropic-messages-session.auto.agent_trace_
 fs.rmSync(path.join(root, "examples/cursor-session.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(path.join(root, "examples/aider-history.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(cleanAuditReport, { force: true });
+fs.rmSync(approvalReport, { force: true });
 fs.rmSync(dirtyAuditReport, { force: true });
 fs.rmSync(dirtyCanonical, { force: true });
+fs.rmSync(path.join(root, "examples/.tmp-dirty-approval.json"), { force: true });
 fs.rmSync(discoverOutput, { force: true });
 fs.rmSync(discoverRoot, { recursive: true, force: true });
 fs.rmSync(releaseDir, { recursive: true, force: true });

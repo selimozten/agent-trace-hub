@@ -10,9 +10,10 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 | Normalize raw traces | yes | Converts supported sources into `agent_trace_v1`. |
 | Validate canonical shards | yes | Validates required canonical structure and message/tool-call invariants. |
 | Audit canonical shards | yes | `audit` performs deterministic checks for known secrets, deny patterns, common credential patterns, and image blocks. |
+| Approve canonical shards | yes | `approve` creates explicit human approval artifacts from passing audit reports. |
 | Package canonical release | yes | `release` validates canonical inputs and writes `data/`, `manifest.jsonl`, `dataset_info.json`, and a dataset card. |
 | Render training targets | yes | Renders multiple model-family formats from canonical data. |
-| Review/redact before release | partial | Strong inherited Pi workflow plus deterministic canonical audit; deeper LLM/human review gates still need a dataset-level command. |
+| Review/redact before release | partial | Strong inherited Pi workflow plus deterministic canonical audit and human approval; deeper LLM-assisted review still needs a dataset-level command. |
 
 ## Current Support
 
@@ -62,7 +63,7 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 
 - Move source adapters into separate modules once more than five are implemented.
 - Add JSON Schema export for `agent_trace_v1`.
-- Add LLM/human review gates for canonical shards.
+- Add LLM-assisted review gates for canonical shards.
 - Add configurable redaction profiles for local/private/public release modes.
 - Preserve tool schemas when source logs include them.
 - Add outcome enrichers for final diff, tests run, exit codes, build status, and user acceptance.

@@ -1,6 +1,6 @@
 import os from "node:os";
 import path from "node:path";
-import type { AuditOptions, CollectOptions, DiscoverOptions, GrepOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, ReleaseOptions, RenderOptions, ReviewOptions, UploadOptions, ValidateOptions } from "./types.ts";
+import type { ApproveOptions, AuditOptions, CollectOptions, DiscoverOptions, GrepOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, ReleaseOptions, RenderOptions, ReviewOptions, UploadOptions, ValidateOptions } from "./types.ts";
 import { loadDenyPatterns } from "./review.ts";
 
 export function printUsage(): void {
@@ -20,6 +20,7 @@ Usage:
   agent-trace-hub normalize-dir --source <source> --input-dir <dir> --output <file.jsonl> [options]
   agent-trace-hub validate --input <file.jsonl>
   agent-trace-hub audit --input <file.jsonl> [--output <file.json>] [options]
+  agent-trace-hub approve --audit-report <file.json> --output <file.json> --reviewer <name> [options]
   agent-trace-hub render --format <format> --input <file.jsonl> --output <file.jsonl>
   agent-trace-hub release --input <file.jsonl>... --output-dir <dir> [options]
 
@@ -36,6 +37,7 @@ Commands:
   normalize-dir Convert a directory of JSONL traces into one canonical agent_trace_v1 JSONL
   validate  Validate canonical agent_trace_v1 JSONL
   audit     Audit canonical traces for deterministic release blockers
+  approve   Create a human approval artifact from a passing audit report
   render    Render canonical traces into model-specific training formats
   release   Build a local publishable canonical dataset directory
 
@@ -110,6 +112,12 @@ Audit options:
   --deny <file>|<regex>   Deny pattern: file with one regex per line, or a regex string (repeatable)
   --fail-on <mode>        any, blocking, or never (default: blocking)
 
+Approve options:
+  --audit-report <file>   Passing agent_trace_audit_v1 report
+  --output <file.json>    Approval report path
+  --reviewer <name>       Human reviewer name or handle
+  --notes <text>          Optional approval notes
+
 Render options:
   --format <format>       Target format: openai-chat, anthropic-messages, chatml, sharegpt, sft-text, ornith-qwen-xml
   --input <file>          Canonical agent_trace_v1 JSONL
@@ -119,6 +127,7 @@ Release options:
   --input <file>          Canonical agent_trace_v1 JSONL shard (repeatable)
   --output-dir <dir>      Output dataset directory
   --audit-report <file>   Require a passing agent_trace_audit_v1 report
+  --approval-report <file> Require an approved agent_trace_approval_v1 report
   --name <name>           Dataset display name (default: agent-trace-hub canonical traces)
   --license <id>          Dataset license id/string (default: other)
   --force                 Replace an existing non-empty output directory
@@ -405,6 +414,27 @@ export function parseAuditArgs(args: string[]): AuditOptions {
   return { input, output, envFile, secrets, denyPatterns: loadDenyPatterns(denyInputs), failOn };
 }
 
+export function parseApproveArgs(args: string[]): ApproveOptions {
+  let auditReport = "";
+  let output = "";
+  let reviewer = "";
+  let notes: string | undefined;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--audit-report") auditReport = path.resolve(requireValue(args, ++i, "--audit-report"));
+    else if (arg === "--output") output = path.resolve(requireValue(args, ++i, "--output"));
+    else if (arg === "--reviewer") reviewer = requireValue(args, ++i, "--reviewer");
+    else if (arg === "--notes") notes = requireValue(args, ++i, "--notes");
+    else throw new Error(`Unknown approve option: ${arg}`);
+  }
+
+  if (!auditReport) throw new Error("approve requires --audit-report");
+  if (!output) throw new Error("approve requires --output");
+  if (!reviewer) throw new Error("approve requires --reviewer");
+  return { auditReport, output, reviewer, notes };
+}
+
 export function parseRenderArgs(args: string[]): RenderOptions {
   let format = "";
   let input = "";
@@ -428,6 +458,7 @@ export function parseReleaseArgs(args: string[]): ReleaseOptions {
   const inputs: string[] = [];
   let outputDir = "";
   let auditReport: string | undefined;
+  let approvalReport: string | undefined;
   let name: string | undefined;
   let license: string | undefined;
   let force = false;
@@ -437,6 +468,7 @@ export function parseReleaseArgs(args: string[]): ReleaseOptions {
     if (arg === "--input") inputs.push(path.resolve(requireValue(args, ++i, "--input")));
     else if (arg === "--output-dir") outputDir = path.resolve(requireValue(args, ++i, "--output-dir"));
     else if (arg === "--audit-report") auditReport = path.resolve(requireValue(args, ++i, "--audit-report"));
+    else if (arg === "--approval-report") approvalReport = path.resolve(requireValue(args, ++i, "--approval-report"));
     else if (arg === "--name") name = requireValue(args, ++i, "--name");
     else if (arg === "--license") license = requireValue(args, ++i, "--license");
     else if (arg === "--force") force = true;
@@ -445,7 +477,7 @@ export function parseReleaseArgs(args: string[]): ReleaseOptions {
 
   if (inputs.length === 0) throw new Error("release requires at least one --input");
   if (!outputDir) throw new Error("release requires --output-dir");
-  return { inputs, outputDir, auditReport, name, license, force };
+  return { inputs, outputDir, auditReport, approvalReport, name, license, force };
 }
 
 function isNormalizeSource(source: string): boolean {

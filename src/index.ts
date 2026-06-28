@@ -1,6 +1,7 @@
 #!/usr/bin/env node --experimental-strip-types --no-warnings=ExperimentalWarning
 
-import { parseAuditArgs, parseCollectArgs, parseDiscoverArgs, parseGrepArgs, parseInitArgs, parseListArgs, parseNormalizeArgs, parseNormalizeDirArgs, parseRejectArgs, parseReleaseArgs, parseRenderArgs, parseReviewArgs, parseUploadArgs, parseValidateArgs, printUsage } from "./cli.ts";
+import { parseApproveArgs, parseAuditArgs, parseCollectArgs, parseDiscoverArgs, parseGrepArgs, parseInitArgs, parseListArgs, parseNormalizeArgs, parseNormalizeDirArgs, parseRejectArgs, parseReleaseArgs, parseRenderArgs, parseReviewArgs, parseUploadArgs, parseValidateArgs, printUsage } from "./cli.ts";
+import { runApprove } from "./approve.ts";
 import { runAudit } from "./audit.ts";
 import { runCollect, runInit } from "./collect.ts";
 import { runDiscover } from "./discover.ts";
@@ -82,6 +83,11 @@ async function main(): Promise<void> {
 
   if (command === "audit") {
     await runAudit(parseAuditArgs(args.slice(1)));
+    return;
+  }
+
+  if (command === "approve") {
+    await runApprove(parseApproveArgs(args.slice(1)));
     return;
   }
 
