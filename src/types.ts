@@ -93,7 +93,7 @@ export interface GrepOptions {
   ignoreCase: boolean;
 }
 
-export type NormalizeSource = "auto" | "pi" | "claude-code" | "codex";
+export type NormalizeSource = "auto" | "pi" | "claude-code" | "codex" | "openai-chat" | "anthropic-messages";
 
 export interface NormalizeOptions {
   source: NormalizeSource;
@@ -103,7 +103,15 @@ export interface NormalizeOptions {
   model?: string;
 }
 
-export type RenderFormat = "openai-chat" | "ornith-qwen-xml";
+export interface NormalizeDirOptions {
+  source: NormalizeSource;
+  inputDir: string;
+  output: string;
+  agent?: string;
+  model?: string;
+}
+
+export type RenderFormat = "openai-chat" | "anthropic-messages" | "chatml" | "sharegpt" | "sft-text" | "ornith-qwen-xml";
 
 export interface RenderOptions {
   format: RenderFormat;

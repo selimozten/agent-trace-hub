@@ -1,8 +1,8 @@
 #!/usr/bin/env node --experimental-strip-types --no-warnings=ExperimentalWarning
 
-import { parseCollectArgs, parseGrepArgs, parseInitArgs, parseListArgs, parseNormalizeArgs, parseRejectArgs, parseRenderArgs, parseReviewArgs, parseUploadArgs, parseValidateArgs, printUsage } from "./cli.ts";
+import { parseCollectArgs, parseGrepArgs, parseInitArgs, parseListArgs, parseNormalizeArgs, parseNormalizeDirArgs, parseRejectArgs, parseRenderArgs, parseReviewArgs, parseUploadArgs, parseValidateArgs, printUsage } from "./cli.ts";
 import { runCollect, runInit } from "./collect.ts";
-import { runNormalize } from "./normalize.ts";
+import { runNormalize, runNormalizeDir } from "./normalize.ts";
 import { runRender } from "./render.ts";
 import { ensureStartupTools } from "./process.ts";
 import { runReject } from "./reject.ts";
@@ -59,6 +59,11 @@ async function main(): Promise<void> {
 
   if (command === "normalize") {
     await runNormalize(parseNormalizeArgs(args.slice(1)));
+    return;
+  }
+
+  if (command === "normalize-dir") {
+    await runNormalizeDir(parseNormalizeDirArgs(args.slice(1)));
     return;
   }
 

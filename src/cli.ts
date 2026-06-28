@@ -1,6 +1,6 @@
 import os from "node:os";
 import path from "node:path";
-import type { CollectOptions, GrepOptions, InitOptions, ListOptions, NormalizeOptions, RejectOptions, RenderOptions, ReviewOptions, UploadOptions, ValidateOptions } from "./types.ts";
+import type { CollectOptions, GrepOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, RenderOptions, ReviewOptions, UploadOptions, ValidateOptions } from "./types.ts";
 import { loadDenyPatterns } from "./review.ts";
 
 export function printUsage(): void {
@@ -16,6 +16,7 @@ Usage:
   agent-trace-hub list [--workspace <dir>] --uploadable
   agent-trace-hub grep [--workspace <dir>] [--ignore-case] <pattern>
   agent-trace-hub normalize --source <source> --input <file.jsonl> --output <file.jsonl> [options]
+  agent-trace-hub normalize-dir --source <source> --input-dir <dir> --output <file.jsonl> [options]
   agent-trace-hub validate --input <file.jsonl>
   agent-trace-hub render --format <format> --input <file.jsonl> --output <file.jsonl>
 
@@ -28,6 +29,7 @@ Commands:
   list      List sessions matching built-in filters
   grep      Ripgrep only the uploadable session set
   normalize Convert a supported raw/redacted agent trace into agent_trace_v1
+  normalize-dir Convert a directory of JSONL traces into one canonical agent_trace_v1 JSONL
   validate  Validate canonical agent_trace_v1 JSONL
   render    Render canonical traces into model-specific training formats
 
@@ -79,9 +81,10 @@ Grep options:
   <pattern>              Ripgrep pattern to run against uploadable sessions
 
 Normalize options:
-  --source <source>       Input source format: auto, pi, claude-code, codex
+  --source <source>       Input source format: auto, pi, claude-code, codex, openai-chat, anthropic-messages
   --input <file>          Source session JSONL
   --output <file>         Output canonical agent_trace_v1 JSONL
+  --input-dir <dir>       Source directory for normalize-dir
   --agent <name>          Source agent label (default: pi)
   --model <id>            Source model id if known
 
@@ -89,7 +92,7 @@ Validate options:
   --input <file>          Canonical agent_trace_v1 JSONL
 
 Render options:
-  --format <format>       Target format: openai-chat, ornith-qwen-xml
+  --format <format>       Target format: openai-chat, anthropic-messages, chatml, sharegpt, sft-text, ornith-qwen-xml
   --input <file>          Canonical agent_trace_v1 JSONL
   --output <file>         Rendered JSONL
 `);
@@ -278,12 +281,37 @@ export function parseNormalizeArgs(args: string[]): NormalizeOptions {
     else throw new Error(`Unknown normalize option: ${arg}`);
   }
 
-  if (!["auto", "pi", "claude-code", "codex"].includes(source)) {
-    throw new Error("normalize --source must be one of: auto, pi, claude-code, codex");
+  if (!isNormalizeSource(source)) {
+    throw new Error("normalize --source must be one of: auto, pi, claude-code, codex, openai-chat, anthropic-messages");
   }
   if (!input) throw new Error("normalize requires --input");
   if (!output) throw new Error("normalize requires --output");
   return { source: source as NormalizeOptions["source"], input, output, agent, model };
+}
+
+export function parseNormalizeDirArgs(args: string[]): NormalizeDirOptions {
+  let source = "auto";
+  let inputDir = "";
+  let output = "";
+  let agent: string | undefined;
+  let model: string | undefined;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--source") source = requireValue(args, ++i, "--source");
+    else if (arg === "--input-dir") inputDir = path.resolve(requireValue(args, ++i, "--input-dir"));
+    else if (arg === "--output") output = path.resolve(requireValue(args, ++i, "--output"));
+    else if (arg === "--agent") agent = requireValue(args, ++i, "--agent");
+    else if (arg === "--model") model = requireValue(args, ++i, "--model");
+    else throw new Error(`Unknown normalize-dir option: ${arg}`);
+  }
+
+  if (!isNormalizeSource(source)) {
+    throw new Error("normalize-dir --source must be one of: auto, pi, claude-code, codex, openai-chat, anthropic-messages");
+  }
+  if (!inputDir) throw new Error("normalize-dir requires --input-dir");
+  if (!output) throw new Error("normalize-dir requires --output");
+  return { source: source as NormalizeDirOptions["source"], inputDir, output, agent, model };
 }
 
 export function parseValidateArgs(args: string[]): ValidateOptions {
@@ -308,12 +336,16 @@ export function parseRenderArgs(args: string[]): RenderOptions {
     else if (arg === "--output") output = path.resolve(requireValue(args, ++i, "--output"));
     else throw new Error(`Unknown render option: ${arg}`);
   }
-  if (!["openai-chat", "ornith-qwen-xml"].includes(format)) {
-    throw new Error("render --format must be one of: openai-chat, ornith-qwen-xml");
+  if (!["openai-chat", "anthropic-messages", "chatml", "sharegpt", "sft-text", "ornith-qwen-xml"].includes(format)) {
+    throw new Error("render --format must be one of: openai-chat, anthropic-messages, chatml, sharegpt, sft-text, ornith-qwen-xml");
   }
   if (!input) throw new Error("render requires --input");
   if (!output) throw new Error("render requires --output");
   return { format: format as RenderOptions["format"], input, output };
+}
+
+function isNormalizeSource(source: string): boolean {
+  return ["auto", "pi", "claude-code", "codex", "openai-chat", "anthropic-messages"].includes(source);
 }
 
 function requireValue(args: string[], index: number, flag: string): string {

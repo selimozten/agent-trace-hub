@@ -9,6 +9,7 @@ import type {
   JsonObject,
   JsonValue,
   NormalizeOptions,
+  NormalizeDirOptions,
   NormalizeSource,
 } from "./types.ts";
 import { validateCanonicalTrace } from "./canonical.ts";
@@ -44,18 +45,72 @@ const ADAPTERS: SourceAdapter[] = [
     detect: detectCodex,
     normalize: normalizeCodexSession,
   },
+  {
+    source: "anthropic-messages",
+    sourceFormat: "anthropic-messages-jsonl",
+    defaultAgent: "anthropic-compatible",
+    detect: detectAnthropicMessages,
+    normalize: normalizeAnthropicMessagesSession,
+  },
+  {
+    source: "openai-chat",
+    sourceFormat: "openai-chat-jsonl",
+    defaultAgent: "openai-compatible",
+    detect: detectOpenAIChat,
+    normalize: normalizeOpenAIChatSession,
+  },
 ];
 
 export async function runNormalize(options: NormalizeOptions): Promise<void> {
   const records = await readJsonlObjects(options.input);
-  const adapter = resolveAdapter(options.source, records);
-  const trace = adapter.normalize(options.input, records, options);
-  validateCanonicalTrace(trace);
+  const { adapter, trace } = normalizeRecords(options.input, records, options);
   fs.mkdirSync(path.dirname(options.output), { recursive: true });
   fs.writeFileSync(options.output, `${JSON.stringify(trace)}\n`);
   console.log(`Wrote canonical trace: ${options.output}`);
   console.log(`Source: ${adapter.source}`);
   console.log(`Messages: ${trace.messages.length}`);
+}
+
+export async function runNormalizeDir(options: NormalizeDirOptions): Promise<void> {
+  const files = findJsonlFiles(options.inputDir);
+  if (files.length === 0) throw new Error(`No .jsonl files found in ${options.inputDir}`);
+  const traces: CanonicalTrace[] = [];
+
+  for (const file of files) {
+    const records = await readJsonlObjects(file);
+    const { trace } = normalizeRecords(file, records, {
+      source: options.source,
+      input: file,
+      output: options.output,
+      agent: options.agent,
+      model: options.model,
+    });
+    traces.push(trace);
+  }
+
+  fs.mkdirSync(path.dirname(options.output), { recursive: true });
+  fs.writeFileSync(options.output, traces.map((trace) => JSON.stringify(trace)).join("\n") + "\n");
+  console.log(`Wrote canonical traces: ${options.output}`);
+  console.log(`Files: ${files.length}`);
+  console.log(`Traces: ${traces.length}`);
+}
+
+function normalizeRecords(inputPath: string, records: JsonObject[], options: NormalizeOptions): { adapter: SourceAdapter; trace: CanonicalTrace } {
+  const adapter = resolveAdapter(options.source, records);
+  const trace = adapter.normalize(inputPath, records, options);
+  validateCanonicalTrace(trace);
+  return { adapter, trace };
+}
+
+function findJsonlFiles(inputDir: string): string[] {
+  const out: string[] = [];
+  const entries = fs.readdirSync(inputDir, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(inputDir, entry.name);
+    if (entry.isDirectory()) out.push(...findJsonlFiles(fullPath));
+    else if (entry.isFile() && entry.name.endsWith(".jsonl")) out.push(fullPath);
+  }
+  return out.sort();
 }
 
 async function readJsonlObjects(inputPath: string): Promise<JsonObject[]> {
@@ -269,6 +324,111 @@ function normalizeCodexSession(inputPath: string, records: JsonObject[], options
 
   flushPendingAssistant(messages, pendingAssistant);
   return baseTrace(inputPath, adapter, { ...options, model }, { session_id: sessionId, cwd, exported_at: exportedAt, model, provider }, messages);
+}
+
+function detectOpenAIChat(records: JsonObject[]): boolean {
+  return records.some((record) => Array.isArray(record.messages))
+    || records.some((record) => typeof record.role === "string" && ["system", "developer", "user", "assistant", "tool"].includes(record.role));
+}
+
+function normalizeOpenAIChatSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
+  const adapter = adapterFor("openai-chat");
+  const root = records.length === 1 && Array.isArray(records[0].messages) ? records[0] : undefined;
+  const sourceMessages = root ? recordsFromArray(records[0].messages as JsonValue[]) : records;
+  const messages: CanonicalMessage[] = [];
+  const sessionId = typeof root?.id === "string" ? root.id : path.basename(inputPath, ".jsonl");
+  const model = options.model ?? (typeof root?.model === "string" ? root.model : undefined);
+
+  for (const message of sourceMessages) {
+    messages.push(...normalizeOpenAIChatMessage(message));
+  }
+
+  return baseTrace(inputPath, adapter, { ...options, model }, { session_id: sessionId, model, provider: "openai" }, messages);
+}
+
+function normalizeOpenAIChatMessage(message: JsonObject): CanonicalMessage[] {
+  const role = typeof message.role === "string" ? message.role : undefined;
+  if (!role) return [];
+
+  if (role === "system" || role === "developer" || role === "user") {
+    return splitUserLikeMessage(role, message.content);
+  }
+
+  if (role === "tool") {
+    return [{
+      role: "tool",
+      tool_call_id: typeof message.tool_call_id === "string" ? message.tool_call_id : undefined,
+      name: typeof message.name === "string" ? message.name : "tool",
+      content: normalizeContentBlocks(message.content),
+    }];
+  }
+
+  if (role === "assistant") {
+    const out: CanonicalMessage = { role: "assistant" };
+    const content = normalizeContentBlocks(message.content);
+    if (content.length > 0) out.content = content;
+    if (typeof message.reasoning_content === "string" && message.reasoning_content) {
+      out.reasoning = [{ type: "text", text: message.reasoning_content }];
+    }
+    if (Array.isArray(message.tool_calls)) {
+      const calls = message.tool_calls.map((call, index) => normalizeOpenAIToolCall(call, index)).filter((call): call is CanonicalToolCall => call !== undefined);
+      if (calls.length > 0) out.tool_calls = calls;
+    }
+    return Object.keys(out).length > 1 ? [out] : [];
+  }
+
+  return [];
+}
+
+function normalizeOpenAIToolCall(value: JsonValue, index: number): CanonicalToolCall | undefined {
+  if (!isRecord(value)) return undefined;
+  const fn = isRecord(value.function) ? value.function : value;
+  const id = typeof value.id === "string" ? value.id : `call_${index + 1}`;
+  const name = typeof fn.name === "string" ? fn.name : undefined;
+  if (!name) return undefined;
+  return {
+    id,
+    name,
+    arguments: parseArguments(fn.arguments as JsonValue | undefined),
+  };
+}
+
+function detectAnthropicMessages(records: JsonObject[]): boolean {
+  return records.some((record) => Array.isArray(record.messages) && record.messages.some((item) => isRecord(item) && hasAnthropicContent(item)))
+    || records.some((record) => typeof record.role === "string" && hasAnthropicContent(record));
+}
+
+function normalizeAnthropicMessagesSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
+  const adapter = adapterFor("anthropic-messages");
+  const root = records.length === 1 && Array.isArray(records[0].messages) ? records[0] : undefined;
+  const sourceMessages = root ? recordsFromArray(records[0].messages as JsonValue[]) : records;
+  const messages: CanonicalMessage[] = [];
+  const sessionId = typeof root?.id === "string" ? root.id : path.basename(inputPath, ".jsonl");
+  const model = options.model ?? (typeof root?.model === "string" ? root.model : undefined);
+
+  if (typeof root?.system === "string" && root.system) {
+    messages.push({ role: "system", content: [{ type: "text", text: root.system }] });
+  }
+  for (const message of sourceMessages) {
+    messages.push(...normalizeAgentMessage(message));
+  }
+
+  return baseTrace(inputPath, adapter, { ...options, model }, { session_id: sessionId, model, provider: "anthropic" }, messages);
+}
+
+function recordsFromArray(values: JsonValue[]): JsonObject[] {
+  return values.filter((value): value is JsonObject => isRecord(value));
+}
+
+function hasAnthropicContent(record: JsonObject): boolean {
+  return Array.isArray(record.content)
+    && record.content.some((block) => isRecord(block) && ["text", "thinking", "tool_use", "tool_result"].includes(String(block.type)));
+}
+
+function adapterFor(source: Exclude<NormalizeSource, "auto">): SourceAdapter {
+  const adapter = ADAPTERS.find((candidate) => candidate.source === source);
+  if (!adapter) throw new Error(`Missing adapter: ${source}`);
+  return adapter;
 }
 
 function flushPendingAssistant(messages: CanonicalMessage[], pending: CanonicalMessage | undefined): void {

@@ -20,16 +20,17 @@ Implemented:
 
 - inherited Pi collection/review/upload workflow
 - `normalize` adapters for Pi, Claude Code, and Codex JSONL traces
+- generic `openai-chat` and `anthropic-messages` adapters for harnesses that already export API-shaped message logs
 - `normalize --source auto` source detection
+- `normalize-dir` for combining a directory of trace JSONL files into one canonical JSONL shard
 - `validate` for canonical `agent_trace_v1` JSONL
-- `render` for OpenAI chat JSONL and Ornith/Qwen XML training text
-- fixture regression test covering normalization, validation, rendering, and Codex assistant-turn coalescing
+- `render` for OpenAI chat, Anthropic messages, ChatML, ShareGPT, plain SFT text, and Ornith/Qwen XML training text
+- fixture regression test covering normalization, validation, batch normalization, rendering, auto-detection, and Codex assistant-turn coalescing
 
 Planned:
 
 - dataset-level canonical export after review
-- additional source adapters for OpenCode, Aider, Cursor, Continue, Goose, and raw OpenAI/Anthropic logs
-- additional renderers for Anthropic messages, ChatML, ShareGPT, and plain SFT text
+- additional source adapters for OpenCode, Aider, Cursor, Continue, and Goose when their native logs differ from API-shaped logs
 - release reports and dataset cards for canonical public shards
 
 ## Usage
@@ -49,6 +50,17 @@ Supported source values:
 - `pi`
 - `claude-code`
 - `codex`
+- `openai-chat`
+- `anthropic-messages`
+
+Normalize a directory into one shard:
+
+```bash
+agent-trace-hub normalize-dir \
+  --source auto \
+  --input-dir raw/ \
+  --output canonical/shard-00001.agent_trace_v1.jsonl
+```
 
 Validate canonical JSONL:
 
@@ -73,6 +85,10 @@ agent-trace-hub render \
 Supported render values:
 
 - `openai-chat`
+- `anthropic-messages`
+- `chatml`
+- `sharegpt`
+- `sft-text`
 - `ornith-qwen-xml`
 
 The existing Pi safety workflow remains available:
@@ -129,10 +145,10 @@ npm run build
 
 `npm test` regenerates the examples and verifies:
 
-- Pi, Claude Code, and Codex normalization
+- Pi, Claude Code, Codex, OpenAI-chat, and Anthropic-message normalization
 - canonical schema validation
-- OpenAI chat rendering
-- Ornith/Qwen XML rendering
+- all supported render formats
+- batch `normalize-dir`
 - Codex response-item coalescing into a single assistant turn before tool output
 
 ## Publishing Note

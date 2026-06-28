@@ -9,6 +9,8 @@ const fixtures = [
   ["pi", "examples/pi-session.jsonl", "examples/pi-session.agent_trace_v1.jsonl"],
   ["claude-code", "examples/claude-code-session.jsonl", "examples/claude-code-session.agent_trace_v1.jsonl"],
   ["codex", "examples/codex-session.jsonl", "examples/codex-session.agent_trace_v1.jsonl"],
+  ["openai-chat", "examples/openai-chat-session.jsonl", "examples/openai-chat-session.agent_trace_v1.jsonl"],
+  ["anthropic-messages", "examples/anthropic-messages-session.jsonl", "examples/anthropic-messages-session.agent_trace_v1.jsonl"],
 ];
 
 for (const [source, input, output] of fixtures) {
@@ -18,9 +20,21 @@ for (const [source, input, output] of fixtures) {
 
 run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/codex-session.jsonl", "--output", "examples/codex-session.auto.agent_trace_v1.jsonl"]);
 run([...nodeArgs, "validate", "--input", "examples/codex-session.auto.agent_trace_v1.jsonl"]);
+run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/anthropic-messages-session.jsonl", "--output", "examples/anthropic-messages-session.auto.agent_trace_v1.jsonl"]);
+run([...nodeArgs, "validate", "--input", "examples/anthropic-messages-session.auto.agent_trace_v1.jsonl"]);
 
-run([...nodeArgs, "render", "--format", "openai-chat", "--input", "examples/codex-session.agent_trace_v1.jsonl", "--output", "examples/codex-session.openai-chat.jsonl"]);
-run([...nodeArgs, "render", "--format", "ornith-qwen-xml", "--input", "examples/codex-session.agent_trace_v1.jsonl", "--output", "examples/codex-session.ornith-qwen-xml.jsonl"]);
+const tmpRawDir = path.join(root, "examples/.tmp-raw");
+fs.rmSync(tmpRawDir, { recursive: true, force: true });
+fs.mkdirSync(tmpRawDir, { recursive: true });
+for (const [, input] of fixtures) {
+  fs.copyFileSync(path.join(root, input), path.join(tmpRawDir, path.basename(input)));
+}
+run([...nodeArgs, "normalize-dir", "--source", "auto", "--input-dir", tmpRawDir, "--output", "examples/all.agent_trace_v1.jsonl"]);
+run([...nodeArgs, "validate", "--input", "examples/all.agent_trace_v1.jsonl"]);
+
+for (const format of ["openai-chat", "anthropic-messages", "chatml", "sharegpt", "sft-text", "ornith-qwen-xml"]) {
+  run([...nodeArgs, "render", "--format", format, "--input", "examples/codex-session.agent_trace_v1.jsonl", "--output", `examples/codex-session.${format}.jsonl`]);
+}
 
 assertJsonl("examples/codex-session.agent_trace_v1.jsonl", (trace) => {
   assert(trace.schema === "agent_trace_v1", "schema mismatch");
@@ -29,6 +43,8 @@ assertJsonl("examples/codex-session.agent_trace_v1.jsonl", (trace) => {
 });
 
 fs.rmSync(path.join(root, "examples/codex-session.auto.agent_trace_v1.jsonl"), { force: true });
+fs.rmSync(path.join(root, "examples/anthropic-messages-session.auto.agent_trace_v1.jsonl"), { force: true });
+fs.rmSync(tmpRawDir, { recursive: true, force: true });
 console.log("fixture verification passed");
 
 function run(args) {
