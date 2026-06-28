@@ -1,6 +1,6 @@
 import os from "node:os";
 import path from "node:path";
-import type { ApproveOptions, ArtifactKind, AuditOptions, CollectOptions, DiscoverOptions, GrepOptions, IngestOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, ReleaseOptions, RenderOptions, ReviewOptions, UploadOptions, ValidateArtifactOptions, ValidateOptions } from "./types.ts";
+import type { ApproveOptions, ArtifactKind, AuditOptions, CollectOptions, DiscoverOptions, EnrichOptions, GrepOptions, IngestOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, ReleaseOptions, RenderOptions, ReviewOptions, UploadOptions, ValidateArtifactOptions, ValidateOptions } from "./types.ts";
 import { loadDenyPatterns } from "./review.ts";
 
 export function printUsage(): void {
@@ -24,6 +24,7 @@ Usage:
   agent-trace-hub audit --input <file.jsonl> [--output <file.json>] [options]
   agent-trace-hub approve --audit-report <file.json> --output <file.json> --reviewer <name> [options]
   agent-trace-hub render --format <format> --input <file.jsonl> --output <file.jsonl>
+  agent-trace-hub enrich --input <file.jsonl> --output <file.jsonl>
   agent-trace-hub release --input <file.jsonl>... --output-dir <dir> [options]
 
 Commands:
@@ -43,6 +44,7 @@ Commands:
   audit     Audit canonical traces for deterministic release blockers
   approve   Create a human approval artifact from a passing audit report
   render    Render canonical traces into model-specific training formats
+  enrich    Add deterministic outcome signals to canonical traces
   release   Build a local publishable canonical dataset directory
 
 Init options:
@@ -137,6 +139,10 @@ Render options:
   --format <format>       Target format: openai-chat, anthropic-messages, chatml, sharegpt, sft-text, ornith-qwen-xml
   --input <file>          Canonical agent_trace_v1 JSONL
   --output <file>         Rendered JSONL
+
+Enrich options:
+  --input <file>          Canonical agent_trace_v1 JSONL
+  --output <file>         Enriched canonical agent_trace_v1 JSONL
 
 Release options:
   --input <file>          Canonical agent_trace_v1 JSONL shard (repeatable)
@@ -509,6 +515,20 @@ export function parseRenderArgs(args: string[]): RenderOptions {
   if (!input) throw new Error("render requires --input");
   if (!output) throw new Error("render requires --output");
   return { format: format as RenderOptions["format"], input, output };
+}
+
+export function parseEnrichArgs(args: string[]): EnrichOptions {
+  let input = "";
+  let output = "";
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--input") input = path.resolve(requireValue(args, ++i, "--input"));
+    else if (arg === "--output") output = path.resolve(requireValue(args, ++i, "--output"));
+    else throw new Error(`Unknown enrich option: ${arg}`);
+  }
+  if (!input) throw new Error("enrich requires --input");
+  if (!output) throw new Error("enrich requires --output");
+  return { input, output };
 }
 
 export function parseReleaseArgs(args: string[]): ReleaseOptions {

@@ -48,6 +48,13 @@ run([...nodeArgs, "validate", "--input", "examples/all.agent_trace_v1.jsonl"]);
 for (const format of ["openai-chat", "anthropic-messages", "chatml", "sharegpt", "sft-text", "ornith-qwen-xml"]) {
   run([...nodeArgs, "render", "--format", format, "--input", "examples/codex-session.agent_trace_v1.jsonl", "--output", `examples/codex-session.${format}.jsonl`]);
 }
+const enrichedCodex = path.join(root, "examples/codex-session.enriched.agent_trace_v1.jsonl");
+run([...nodeArgs, "enrich", "--input", "examples/codex-session.agent_trace_v1.jsonl", "--output", enrichedCodex]);
+run([...nodeArgs, "validate", "--input", enrichedCodex]);
+const enrichedTrace = readJsonl(enrichedCodex)[0];
+assert(enrichedTrace.outcome.signals.tests.run === true, "enrich should mark tests as run");
+assert(enrichedTrace.outcome.signals.tests.status === "failed", "enrich should infer failed test status");
+assert(enrichedTrace.outcome.signals.commands[0].command === "pytest -q", "enrich should preserve command text");
 
 const discoverRoot = path.join(root, "examples/.tmp-discover");
 const discoverOutput = path.join(root, "examples/discovered-traces.jsonl");
@@ -249,6 +256,7 @@ for (const source of ["opencode", "continue", "goose"]) {
 }
 
 fs.rmSync(path.join(root, "examples/codex-session.auto.agent_trace_v1.jsonl"), { force: true });
+fs.rmSync(enrichedCodex, { force: true });
 fs.rmSync(path.join(root, "examples/anthropic-messages-session.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(path.join(root, "examples/cursor-session.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(path.join(root, "examples/generic-json-session.auto.agent_trace_v1.jsonl"), { force: true });

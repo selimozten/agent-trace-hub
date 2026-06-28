@@ -15,6 +15,7 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 | Approve canonical shards | yes | `approve` creates explicit human approval artifacts from passing audit reports. |
 | Package canonical release | yes | `release` validates canonical inputs and writes `data/`, `manifest.jsonl`, `dataset_info.json`, and a dataset card. |
 | Render training targets | yes | Renders multiple model-family formats from canonical data. |
+| Enrich outcomes | yes | `enrich` derives command, test, build, final-diff availability, and user-acceptance signals from canonical traces. |
 | Review/redact before release | partial | Strong inherited Pi workflow plus deterministic canonical audit and human approval; deeper LLM-assisted review still needs a dataset-level command. |
 
 ## Current Support
@@ -66,5 +67,4 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 
 - Move source adapters into separate modules once more than five are implemented.
 - Add LLM-assisted review gates for canonical shards.
-- Add outcome enrichers for final diff, tests run, exit codes, build status, and user acceptance.
 - Resolve licensing before publishing a public fork based on upstream code.

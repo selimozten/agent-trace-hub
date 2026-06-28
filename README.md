@@ -35,6 +35,7 @@ Implemented:
 - audit profiles for local, private, and public release policies
 - `approve` for explicit human approval artifacts tied to passing audit reports
 - `render` for OpenAI chat, Anthropic messages, ChatML, ShareGPT, plain SFT text, and Ornith/Qwen XML training text
+- `enrich` for deterministic outcome signals such as commands, tests, build status, final diff availability, and user acceptance placeholders
 - `release` for packaging validated canonical shards with manifest metadata and a dataset card
 - GitHub Actions CI for check, test, and build
 - fixture regression test covering normalization, validation, batch normalization, rendering, auto-detection, and Codex assistant-turn coalescing
@@ -172,6 +173,16 @@ Supported render values:
 - `sft-text`
 - `ornith-qwen-xml`
 
+Enrich canonical traces with deterministic outcome signals:
+
+```bash
+agent-trace-hub enrich \
+  --input canonical/session.agent_trace_v1.jsonl \
+  --output canonical/session.enriched.agent_trace_v1.jsonl
+```
+
+`enrich` derives command, test, and build signals from assistant tool calls and tool outputs. It preserves existing canonical content and writes the signals under `outcome.signals`.
+
 The existing Pi safety workflow remains available:
 
 ```bash
@@ -243,6 +254,7 @@ npm run build
 - human approval artifact generation and release gating
 - canonical release packaging, manifest counts, and overwrite protection
 - all supported render formats
+- deterministic outcome enrichment
 - batch `normalize-dir`
 - Codex response-item coalescing into a single assistant turn before tool output
 

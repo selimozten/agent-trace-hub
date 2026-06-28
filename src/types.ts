@@ -160,6 +160,11 @@ export interface RenderOptions {
   output: string;
 }
 
+export interface EnrichOptions {
+  input: string;
+  output: string;
+}
+
 export interface ValidateOptions {
   input: string;
 }
@@ -300,7 +305,7 @@ export interface CanonicalTrace {
   messages: CanonicalMessage[];
   outcome: {
     quality: "unlabeled";
-  };
+  } & JsonObject;
 }
 
 export interface Finding {
