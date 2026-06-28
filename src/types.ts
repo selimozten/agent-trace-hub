@@ -93,7 +93,16 @@ export interface GrepOptions {
   ignoreCase: boolean;
 }
 
-export type NormalizeSource = "auto" | "pi" | "claude-code" | "codex" | "openai-chat" | "anthropic-messages";
+export type NormalizeSource =
+  | "auto"
+  | "pi"
+  | "claude-code"
+  | "codex"
+  | "cursor"
+  | "openai-chat"
+  | "anthropic-messages"
+  | "markdown-transcript"
+  | "aider";
 
 export interface NormalizeOptions {
   source: NormalizeSource;

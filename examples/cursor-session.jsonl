@@ -1,0 +1,4 @@
+{"role":"user","message":{"content":[{"type":"text","text":"Run the tests and fix the failing assertion."}]}}
+{"role":"assistant","message":{"content":[{"type":"text","text":"I will inspect the test output first."}]}}
+{"role":"assistant","message":{"content":[{"type":"toolCall","id":"call_1","name":"shell","arguments":{"cmd":"pytest -q"}}]}}
+{"role":"user","message":{"content":[{"type":"tool_result","tool_use_id":"call_1","content":[{"type":"text","text":"1 failed, 12 passed"}]}]}}

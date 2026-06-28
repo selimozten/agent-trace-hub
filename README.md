@@ -20,6 +20,8 @@ Implemented:
 
 - inherited Pi collection/review/upload workflow
 - `normalize` adapters for Pi, Claude Code, and Codex JSONL traces
+- native `cursor` transcript adapter
+- `aider` and `markdown-transcript` adapters for markdown-style CLI histories
 - generic `openai-chat` and `anthropic-messages` adapters for harnesses that already export API-shaped message logs
 - `normalize --source auto` source detection
 - `normalize-dir` for combining a directory of trace JSONL files into one canonical JSONL shard
@@ -30,7 +32,7 @@ Implemented:
 Planned:
 
 - dataset-level canonical export after review
-- additional source adapters for OpenCode, Aider, Cursor, Continue, and Goose when their native logs differ from API-shaped logs
+- additional source adapters for OpenCode, Continue, and Goose when their native logs differ from API-shaped logs
 - release reports and dataset cards for canonical public shards
 
 ## Usage
@@ -50,8 +52,11 @@ Supported source values:
 - `pi`
 - `claude-code`
 - `codex`
+- `cursor`
 - `openai-chat`
 - `anthropic-messages`
+- `aider`
+- `markdown-transcript`
 
 Normalize a directory into one shard:
 
@@ -149,7 +154,7 @@ npm run build
 
 `npm test` regenerates the examples and verifies:
 
-- Pi, Claude Code, Codex, OpenAI-chat, and Anthropic-message normalization
+- Pi, Claude Code, Codex, Cursor, Aider, Markdown transcript, OpenAI-chat, and Anthropic-message normalization
 - canonical schema validation
 - all supported render formats
 - batch `normalize-dir`

@@ -9,8 +9,11 @@ const fixtures = [
   ["pi", "examples/pi-session.jsonl", "examples/pi-session.agent_trace_v1.jsonl"],
   ["claude-code", "examples/claude-code-session.jsonl", "examples/claude-code-session.agent_trace_v1.jsonl"],
   ["codex", "examples/codex-session.jsonl", "examples/codex-session.agent_trace_v1.jsonl"],
+  ["cursor", "examples/cursor-session.jsonl", "examples/cursor-session.agent_trace_v1.jsonl"],
   ["openai-chat", "examples/openai-chat-session.jsonl", "examples/openai-chat-session.agent_trace_v1.jsonl"],
   ["anthropic-messages", "examples/anthropic-messages-session.jsonl", "examples/anthropic-messages-session.agent_trace_v1.jsonl"],
+  ["aider", "examples/aider-history.md", "examples/aider-history.agent_trace_v1.jsonl"],
+  ["markdown-transcript", "examples/markdown-transcript.md", "examples/markdown-transcript.agent_trace_v1.jsonl"],
 ];
 
 for (const [source, input, output] of fixtures) {
@@ -22,6 +25,10 @@ run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/codex-se
 run([...nodeArgs, "validate", "--input", "examples/codex-session.auto.agent_trace_v1.jsonl"]);
 run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/anthropic-messages-session.jsonl", "--output", "examples/anthropic-messages-session.auto.agent_trace_v1.jsonl"]);
 run([...nodeArgs, "validate", "--input", "examples/anthropic-messages-session.auto.agent_trace_v1.jsonl"]);
+run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/cursor-session.jsonl", "--output", "examples/cursor-session.auto.agent_trace_v1.jsonl"]);
+run([...nodeArgs, "validate", "--input", "examples/cursor-session.auto.agent_trace_v1.jsonl"]);
+run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/aider-history.md", "--output", "examples/aider-history.auto.agent_trace_v1.jsonl"]);
+run([...nodeArgs, "validate", "--input", "examples/aider-history.auto.agent_trace_v1.jsonl"]);
 
 const tmpRawDir = path.join(root, "examples/.tmp-raw");
 fs.rmSync(tmpRawDir, { recursive: true, force: true });
@@ -44,6 +51,8 @@ assertJsonl("examples/codex-session.agent_trace_v1.jsonl", (trace) => {
 
 fs.rmSync(path.join(root, "examples/codex-session.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(path.join(root, "examples/anthropic-messages-session.auto.agent_trace_v1.jsonl"), { force: true });
+fs.rmSync(path.join(root, "examples/cursor-session.auto.agent_trace_v1.jsonl"), { force: true });
+fs.rmSync(path.join(root, "examples/aider-history.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(tmpRawDir, { recursive: true, force: true });
 console.log("fixture verification passed");
 

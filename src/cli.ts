@@ -81,8 +81,8 @@ Grep options:
   <pattern>              Ripgrep pattern to run against uploadable sessions
 
 Normalize options:
-  --source <source>       Input source format: auto, pi, claude-code, codex, openai-chat, anthropic-messages
-  --input <file>          Source session JSONL
+  --source <source>       Input source format: auto, pi, claude-code, codex, cursor, openai-chat, anthropic-messages, markdown-transcript, aider
+  --input <file>          Source session file
   --output <file>         Output canonical agent_trace_v1 JSONL
   --input-dir <dir>       Source directory for normalize-dir
   --agent <name>          Source agent label (default: pi)
@@ -282,7 +282,7 @@ export function parseNormalizeArgs(args: string[]): NormalizeOptions {
   }
 
   if (!isNormalizeSource(source)) {
-    throw new Error("normalize --source must be one of: auto, pi, claude-code, codex, openai-chat, anthropic-messages");
+    throw new Error(`normalize --source must be one of: ${normalizeSourceList()}`);
   }
   if (!input) throw new Error("normalize requires --input");
   if (!output) throw new Error("normalize requires --output");
@@ -307,7 +307,7 @@ export function parseNormalizeDirArgs(args: string[]): NormalizeDirOptions {
   }
 
   if (!isNormalizeSource(source)) {
-    throw new Error("normalize-dir --source must be one of: auto, pi, claude-code, codex, openai-chat, anthropic-messages");
+    throw new Error(`normalize-dir --source must be one of: ${normalizeSourceList()}`);
   }
   if (!inputDir) throw new Error("normalize-dir requires --input-dir");
   if (!output) throw new Error("normalize-dir requires --output");
@@ -345,7 +345,11 @@ export function parseRenderArgs(args: string[]): RenderOptions {
 }
 
 function isNormalizeSource(source: string): boolean {
-  return ["auto", "pi", "claude-code", "codex", "openai-chat", "anthropic-messages"].includes(source);
+  return ["auto", "pi", "claude-code", "codex", "cursor", "openai-chat", "anthropic-messages", "markdown-transcript", "aider"].includes(source);
+}
+
+function normalizeSourceList(): string {
+  return "auto, pi, claude-code, codex, cursor, openai-chat, anthropic-messages, markdown-transcript, aider";
 }
 
 function requireValue(args: string[], index: number, flag: string): string {

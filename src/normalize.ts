@@ -46,6 +46,13 @@ const ADAPTERS: SourceAdapter[] = [
     normalize: normalizeCodexSession,
   },
   {
+    source: "cursor",
+    sourceFormat: "cursor-agent-transcript-jsonl",
+    defaultAgent: "cursor",
+    detect: detectCursor,
+    normalize: normalizeCursorSession,
+  },
+  {
     source: "anthropic-messages",
     sourceFormat: "anthropic-messages-jsonl",
     defaultAgent: "anthropic-compatible",
@@ -58,6 +65,20 @@ const ADAPTERS: SourceAdapter[] = [
     defaultAgent: "openai-compatible",
     detect: detectOpenAIChat,
     normalize: normalizeOpenAIChatSession,
+  },
+  {
+    source: "aider",
+    sourceFormat: "aider-markdown-history",
+    defaultAgent: "aider",
+    detect: detectAider,
+    normalize: normalizeMarkdownTranscriptSession,
+  },
+  {
+    source: "markdown-transcript",
+    sourceFormat: "markdown-transcript",
+    defaultAgent: "markdown-transcript",
+    detect: detectMarkdownTranscript,
+    normalize: normalizeMarkdownTranscriptSession,
   },
 ];
 
@@ -108,12 +129,19 @@ function findJsonlFiles(inputDir: string): string[] {
   for (const entry of entries) {
     const fullPath = path.join(inputDir, entry.name);
     if (entry.isDirectory()) out.push(...findJsonlFiles(fullPath));
-    else if (entry.isFile() && entry.name.endsWith(".jsonl")) out.push(fullPath);
+    else if (entry.isFile() && isSupportedInputFile(entry.name)) out.push(fullPath);
   }
   return out.sort();
 }
 
 async function readJsonlObjects(inputPath: string): Promise<JsonObject[]> {
+  const text = fs.readFileSync(inputPath, "utf-8");
+  if (!inputPath.endsWith(".jsonl")) {
+    const parsed = parseJsonDocument(text);
+    if (parsed) return parsed;
+    return [{ _raw_text: text, _raw_format: path.extname(inputPath).slice(1) || "text" }];
+  }
+
   const input = fs.createReadStream(inputPath, { encoding: "utf-8" });
   const reader = readline.createInterface({ input, crlfDelay: Infinity });
   const records: JsonObject[] = [];
@@ -129,6 +157,21 @@ async function readJsonlObjects(inputPath: string): Promise<JsonObject[]> {
   }
 
   return records;
+}
+
+function isSupportedInputFile(name: string): boolean {
+  return [".jsonl", ".json", ".md", ".markdown", ".txt"].some((ext) => name.endsWith(ext));
+}
+
+function parseJsonDocument(text: string): JsonObject[] | undefined {
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    if (Array.isArray(parsed)) return parsed.filter((item): item is JsonObject => isRecord(item));
+    if (isRecord(parsed)) return [parsed as JsonObject];
+  } catch {
+    return undefined;
+  }
+  return undefined;
 }
 
 function resolveAdapter(source: NormalizeSource, records: JsonObject[]): SourceAdapter {
@@ -326,6 +369,46 @@ function normalizeCodexSession(inputPath: string, records: JsonObject[], options
   return baseTrace(inputPath, adapter, { ...options, model }, { session_id: sessionId, cwd, exported_at: exportedAt, model, provider }, messages);
 }
 
+function detectCursor(records: JsonObject[]): boolean {
+  return records.some((record) => typeof record.role === "string" && isRecord(record.message) && Array.isArray((record.message as JsonObject).content));
+}
+
+function normalizeCursorSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
+  const adapter = adapterFor("cursor");
+  const messages: CanonicalMessage[] = [];
+  let model = options.model;
+  let sessionId = path.basename(inputPath, ".jsonl");
+
+  for (const record of records) {
+    if (typeof record.sessionId === "string") sessionId = record.sessionId;
+    const message = isRecord(record.message) ? record.message as JsonObject : record;
+    if (!model && typeof message.model === "string") model = message.model;
+    messages.push(...normalizeAgentMessage({
+      ...message,
+      role: typeof record.role === "string" ? record.role : message.role,
+    }));
+  }
+
+  return baseTrace(inputPath, adapter, { ...options, model }, { session_id: sessionId, model, provider: "cursor" }, messages);
+}
+
+function detectAider(records: JsonObject[]): boolean {
+  const text = rawText(records);
+  return text !== undefined && /aider/i.test(text) && (/^####\s+/m.test(text) || /^#\s+aider chat/i.test(text));
+}
+
+function detectMarkdownTranscript(records: JsonObject[]): boolean {
+  const text = rawText(records);
+  return text !== undefined && parseMarkdownMessages(text).length > 0;
+}
+
+function normalizeMarkdownTranscriptSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
+  const adapter = options.source === "aider" ? adapterFor("aider") : adapterFor("markdown-transcript");
+  const text = rawText(records) ?? "";
+  const messages = parseMarkdownMessages(text);
+  return baseTrace(inputPath, adapter, options, { session_id: path.basename(inputPath, path.extname(inputPath)) }, messages);
+}
+
 function detectOpenAIChat(records: JsonObject[]): boolean {
   return records.some((record) => Array.isArray(record.messages))
     || records.some((record) => typeof record.role === "string" && ["system", "developer", "user", "assistant", "tool"].includes(record.role));
@@ -418,6 +501,64 @@ function normalizeAnthropicMessagesSession(inputPath: string, records: JsonObjec
 
 function recordsFromArray(values: JsonValue[]): JsonObject[] {
   return values.filter((value): value is JsonObject => isRecord(value));
+}
+
+function rawText(records: JsonObject[]): string | undefined {
+  const first = records[0];
+  return typeof first?._raw_text === "string" ? first._raw_text : undefined;
+}
+
+function parseMarkdownMessages(text: string): CanonicalMessage[] {
+  const lines = text.split(/\r?\n/);
+  const messages: CanonicalMessage[] = [];
+  let currentRole: CanonicalMessage["role"] | undefined;
+  let current: string[] = [];
+
+  function flush(): void {
+    if (!currentRole) {
+      current = [];
+      return;
+    }
+    const body = current.join("\n").trim();
+    if (body) messages.push({ role: currentRole, content: [{ type: "text", text: body }] });
+    current = [];
+  }
+
+  for (const line of lines) {
+    const heading = parseMarkdownRoleHeading(line);
+    if (heading) {
+      flush();
+      currentRole = heading;
+      const rest = stripMarkdownRoleHeading(line).trim();
+      if (rest) current.push(rest);
+      continue;
+    }
+
+    if (currentRole) current.push(line);
+  }
+
+  flush();
+  return messages;
+}
+
+function parseMarkdownRoleHeading(line: string): CanonicalMessage["role"] | undefined {
+  const trimmed = line.trim();
+  const match = /^(?:#{1,6}\s*)?(?:\*\*)?(system|developer|user|human|assistant|ai|tool)(?:\*\*)?\s*:?\s*/i.exec(trimmed);
+  if (!match) {
+    if (/^####\s+/.test(trimmed)) return "user";
+    return undefined;
+  }
+  const role = match[1].toLowerCase();
+  if (role === "human") return "user";
+  if (role === "ai") return "assistant";
+  if (role === "system" || role === "developer" || role === "user" || role === "assistant" || role === "tool") return role;
+  return undefined;
+}
+
+function stripMarkdownRoleHeading(line: string): string {
+  const trimmed = line.trim();
+  if (/^####\s+/.test(trimmed)) return trimmed.replace(/^####\s+/, "");
+  return trimmed.replace(/^(?:#{1,6}\s*)?(?:\*\*)?(?:system|developer|user|human|assistant|ai|tool)(?:\*\*)?\s*:?\s*/i, "");
 }
 
 function hasAnthropicContent(record: JsonObject): boolean {

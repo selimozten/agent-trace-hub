@@ -9,6 +9,9 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 | Pi | yes | yes | yes | Inherited safety workflow is still Pi-first. |
 | Claude Code | yes | yes | yes | Handles nested `message`, thinking, text, tool use, and tool result blocks. |
 | Codex | yes | yes | yes | Handles rollout envelopes, response items, reasoning summaries, function calls, and tool outputs. |
+| Cursor | yes | yes | yes | Handles Cursor `agent-transcripts` JSONL with top-level role and nested message content. |
+| Aider markdown history | yes | yes | yes | Handles common markdown role sections and `####` user prompts. |
+| Markdown transcript | yes | yes | yes | Generic explicit role-heading transcript fallback. |
 | OpenAI-compatible chat | yes | yes | yes | Covers harnesses that persist OpenAI Chat Completions-style `messages`. |
 | Anthropic-compatible messages | yes | yes | yes | Covers harnesses that persist Anthropic `messages` content blocks. |
 
@@ -17,8 +20,6 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 | Harness/source | Priority | Notes |
 | --- | --- | --- |
 | OpenCode | high | Common OpenAI-compatible coding CLI; likely JSON event logs/config-dependent. |
-| Aider | high | Needs parser for chat history plus repository diff/test outcomes. |
-| Cursor | medium | Export format varies by local storage and privacy boundaries. |
 | Continue | medium | Often stores chat/session data in IDE extension state. |
 | Goose | medium | Tool-call/session schema should map cleanly to canonical messages. |
 | raw OpenAI chat logs | done | Useful fallback adapter for many harnesses. |
