@@ -1,6 +1,6 @@
 import os from "node:os";
 import path from "node:path";
-import type { CollectOptions, DiscoverOptions, GrepOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, RenderOptions, ReviewOptions, UploadOptions, ValidateOptions } from "./types.ts";
+import type { CollectOptions, DiscoverOptions, GrepOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, ReleaseOptions, RenderOptions, ReviewOptions, UploadOptions, ValidateOptions } from "./types.ts";
 import { loadDenyPatterns } from "./review.ts";
 
 export function printUsage(): void {
@@ -20,6 +20,7 @@ Usage:
   agent-trace-hub normalize-dir --source <source> --input-dir <dir> --output <file.jsonl> [options]
   agent-trace-hub validate --input <file.jsonl>
   agent-trace-hub render --format <format> --input <file.jsonl> --output <file.jsonl>
+  agent-trace-hub release --input <file.jsonl>... --output-dir <dir> [options]
 
 Commands:
   init      Create a workspace and store cwd/repo configuration
@@ -34,6 +35,7 @@ Commands:
   normalize-dir Convert a directory of JSONL traces into one canonical agent_trace_v1 JSONL
   validate  Validate canonical agent_trace_v1 JSONL
   render    Render canonical traces into model-specific training formats
+  release   Build a local publishable canonical dataset directory
 
 Init options:
   --cwd <dir>            Working directory whose pi sessions should be collected (default: .)
@@ -102,6 +104,13 @@ Render options:
   --format <format>       Target format: openai-chat, anthropic-messages, chatml, sharegpt, sft-text, ornith-qwen-xml
   --input <file>          Canonical agent_trace_v1 JSONL
   --output <file>         Rendered JSONL
+
+Release options:
+  --input <file>          Canonical agent_trace_v1 JSONL shard (repeatable)
+  --output-dir <dir>      Output dataset directory
+  --name <name>           Dataset display name (default: agent-trace-hub canonical traces)
+  --license <id>          Dataset license id/string (default: other)
+  --force                 Replace an existing non-empty output directory
 `);
 }
 
@@ -374,6 +383,28 @@ export function parseRenderArgs(args: string[]): RenderOptions {
   if (!input) throw new Error("render requires --input");
   if (!output) throw new Error("render requires --output");
   return { format: format as RenderOptions["format"], input, output };
+}
+
+export function parseReleaseArgs(args: string[]): ReleaseOptions {
+  const inputs: string[] = [];
+  let outputDir = "";
+  let name: string | undefined;
+  let license: string | undefined;
+  let force = false;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--input") inputs.push(path.resolve(requireValue(args, ++i, "--input")));
+    else if (arg === "--output-dir") outputDir = path.resolve(requireValue(args, ++i, "--output-dir"));
+    else if (arg === "--name") name = requireValue(args, ++i, "--name");
+    else if (arg === "--license") license = requireValue(args, ++i, "--license");
+    else if (arg === "--force") force = true;
+    else throw new Error(`Unknown release option: ${arg}`);
+  }
+
+  if (inputs.length === 0) throw new Error("release requires at least one --input");
+  if (!outputDir) throw new Error("release requires --output-dir");
+  return { inputs, outputDir, name, license, force };
 }
 
 function isNormalizeSource(source: string): boolean {

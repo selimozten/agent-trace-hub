@@ -150,6 +150,36 @@ export interface ValidateOptions {
   input: string;
 }
 
+export interface ReleaseOptions {
+  inputs: string[];
+  outputDir: string;
+  name?: string;
+  license?: string;
+  force: boolean;
+}
+
+export interface ReleaseManifestEntry {
+  file: string;
+  source_file: string;
+  schema: "agent_trace_v1";
+  sha256: string;
+  trace_count: number;
+  message_count: number;
+  source_agents: Record<string, number>;
+}
+
+export interface ReleaseDatasetInfo {
+  name: string;
+  schema: "agent_trace_v1";
+  created_at: string;
+  license: string;
+  shard_count: number;
+  trace_count: number;
+  message_count: number;
+  source_agents: Record<string, number>;
+  files: ReleaseManifestEntry[];
+}
+
 export type CanonicalContentBlock =
   | { type: "text"; text: string }
   | { type: "image"; mime_type?: string; data?: string };

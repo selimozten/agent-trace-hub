@@ -29,13 +29,13 @@ Implemented:
 - `normalize-dir` for combining a directory of trace JSONL files into one canonical JSONL shard
 - `validate` for canonical `agent_trace_v1` JSONL
 - `render` for OpenAI chat, Anthropic messages, ChatML, ShareGPT, plain SFT text, and Ornith/Qwen XML training text
+- `release` for packaging validated canonical shards with manifest metadata and a dataset card
 - fixture regression test covering normalization, validation, batch normalization, rendering, auto-detection, and Codex assistant-turn coalescing
 
 Planned:
 
-- dataset-level canonical export after review
 - additional source adapters for OpenCode, Continue, and Goose when their native logs differ from API-shaped logs
-- release reports and dataset cards for canonical public shards
+- dataset-level review gates for canonical public shards
 
 ## Usage
 
@@ -85,6 +85,18 @@ Validate canonical JSONL:
 ```bash
 agent-trace-hub validate --input canonical/session.agent_trace_v1.jsonl
 ```
+
+Build a local canonical dataset release directory:
+
+```bash
+agent-trace-hub release \
+  --input canonical/shard-00001.agent_trace_v1.jsonl \
+  --output-dir release/agent-traces \
+  --name "my coding agent traces" \
+  --license other
+```
+
+The release directory contains `data/*.agent_trace_v1.jsonl`, `manifest.jsonl`, `dataset_info.json`, and `README.md`. It validates input structure and records file hashes/counts; it does not replace redaction or human/LLM review.
 
 Render for training:
 
@@ -170,6 +182,7 @@ npm run build
 - Pi, Claude Code, Codex, Cursor, Aider, Markdown transcript, OpenAI-chat, and Anthropic-message normalization
 - local trace discovery for supported harness directories
 - canonical schema validation
+- canonical release packaging, manifest counts, and overwrite protection
 - all supported render formats
 - batch `normalize-dir`
 - Codex response-item coalescing into a single assistant turn before tool output

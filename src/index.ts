@@ -1,9 +1,10 @@
 #!/usr/bin/env node --experimental-strip-types --no-warnings=ExperimentalWarning
 
-import { parseCollectArgs, parseDiscoverArgs, parseGrepArgs, parseInitArgs, parseListArgs, parseNormalizeArgs, parseNormalizeDirArgs, parseRejectArgs, parseRenderArgs, parseReviewArgs, parseUploadArgs, parseValidateArgs, printUsage } from "./cli.ts";
+import { parseCollectArgs, parseDiscoverArgs, parseGrepArgs, parseInitArgs, parseListArgs, parseNormalizeArgs, parseNormalizeDirArgs, parseRejectArgs, parseReleaseArgs, parseRenderArgs, parseReviewArgs, parseUploadArgs, parseValidateArgs, printUsage } from "./cli.ts";
 import { runCollect, runInit } from "./collect.ts";
 import { runDiscover } from "./discover.ts";
 import { runNormalize, runNormalizeDir } from "./normalize.ts";
+import { runRelease } from "./release.ts";
 import { runRender } from "./render.ts";
 import { ensureStartupTools } from "./process.ts";
 import { runReject } from "./reject.ts";
@@ -80,6 +81,11 @@ async function main(): Promise<void> {
 
   if (command === "render") {
     await runRender(parseRenderArgs(args.slice(1)));
+    return;
+  }
+
+  if (command === "release") {
+    await runRelease(parseReleaseArgs(args.slice(1)));
     return;
   }
 

@@ -80,6 +80,33 @@ const cursorOnly = execFileSync(process.execPath, [...nodeArgs, "discover", "--r
   .map((line) => JSON.parse(line));
 assert(cursorOnly.length === 1 && cursorOnly[0].source === "cursor", "discover --source cursor should only return cursor");
 
+const releaseDir = path.join(root, "examples/.tmp-release");
+fs.rmSync(releaseDir, { recursive: true, force: true });
+run([
+  ...nodeArgs,
+  "release",
+  "--input",
+  "examples/all.agent_trace_v1.jsonl",
+  "--output-dir",
+  releaseDir,
+  "--name",
+  "fixture canonical traces",
+  "--license",
+  "other",
+]);
+const releaseManifest = readJsonl(path.join(releaseDir, "manifest.jsonl"));
+const releaseInfo = JSON.parse(fs.readFileSync(path.join(releaseDir, "dataset_info.json"), "utf-8"));
+assert(releaseManifest.length === 1, "release should create one shard manifest entry");
+assert(releaseManifest[0].trace_count === 11, "release manifest trace count mismatch");
+assert(releaseManifest[0].message_count > 0, "release manifest should count messages");
+assert(releaseManifest[0].sha256.startsWith("sha256:"), "release manifest should include sha256");
+assert(fs.existsSync(path.join(releaseDir, releaseManifest[0].file)), "release shard missing");
+assert(fs.existsSync(path.join(releaseDir, "schema/agent_trace_v1.schema.json")), "release schema missing");
+assert(releaseInfo.name === "fixture canonical traces", "release dataset name mismatch");
+assert(releaseInfo.trace_count === 11, "release dataset trace count mismatch");
+assert(releaseInfo.source_agents.codex === 1, "release source agent counts missing codex");
+assertCommandFails([...nodeArgs, "release", "--input", "examples/all.agent_trace_v1.jsonl", "--output-dir", releaseDir], "release should refuse non-empty output without --force");
+
 assertJsonl("examples/codex-session.agent_trace_v1.jsonl", (trace) => {
   assert(trace.schema === "agent_trace_v1", "schema mismatch");
   assert(trace.messages.length === 3, "codex fixture should coalesce to 3 messages");
@@ -99,11 +126,21 @@ fs.rmSync(path.join(root, "examples/cursor-session.auto.agent_trace_v1.jsonl"), 
 fs.rmSync(path.join(root, "examples/aider-history.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(discoverOutput, { force: true });
 fs.rmSync(discoverRoot, { recursive: true, force: true });
+fs.rmSync(releaseDir, { recursive: true, force: true });
 fs.rmSync(tmpRawDir, { recursive: true, force: true });
 console.log("fixture verification passed");
 
 function run(args) {
   execFileSync(process.execPath, args, { cwd: root, stdio: "inherit" });
+}
+
+function assertCommandFails(args, message) {
+  try {
+    execFileSync(process.execPath, args, { cwd: root, stdio: "pipe" });
+  } catch {
+    return;
+  }
+  throw new Error(message);
 }
 
 function assertJsonl(file, check) {
