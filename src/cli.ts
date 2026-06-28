@@ -1,6 +1,6 @@
 import os from "node:os";
 import path from "node:path";
-import type { ApproveOptions, AuditOptions, CollectOptions, DiscoverOptions, GrepOptions, IngestOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, ReleaseOptions, RenderOptions, ReviewOptions, UploadOptions, ValidateOptions } from "./types.ts";
+import type { ApproveOptions, ArtifactKind, AuditOptions, CollectOptions, DiscoverOptions, GrepOptions, IngestOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, ReleaseOptions, RenderOptions, ReviewOptions, UploadOptions, ValidateArtifactOptions, ValidateOptions } from "./types.ts";
 import { loadDenyPatterns } from "./review.ts";
 
 export function printUsage(): void {
@@ -20,6 +20,7 @@ Usage:
   agent-trace-hub normalize --source <source> --input <file.jsonl> --output <file.jsonl> [options]
   agent-trace-hub normalize-dir --source <source> --input-dir <dir> --output <file.jsonl> [options]
   agent-trace-hub validate --input <file.jsonl>
+  agent-trace-hub validate-artifact --kind <kind> --input <file>
   agent-trace-hub audit --input <file.jsonl> [--output <file.json>] [options]
   agent-trace-hub approve --audit-report <file.json> --output <file.json> --reviewer <name> [options]
   agent-trace-hub render --format <format> --input <file.jsonl> --output <file.jsonl>
@@ -38,6 +39,7 @@ Commands:
   normalize Convert a supported raw/redacted agent trace into agent_trace_v1
   normalize-dir Convert a directory of JSONL traces into one canonical agent_trace_v1 JSONL
   validate  Validate canonical agent_trace_v1 JSONL
+  validate-artifact Validate any agent-trace-hub artifact against its JSON Schema
   audit     Audit canonical traces for deterministic release blockers
   approve   Create a human approval artifact from a passing audit report
   render    Render canonical traces into model-specific training formats
@@ -111,6 +113,10 @@ Normalize options:
 
 Validate options:
   --input <file>          Canonical agent_trace_v1 JSONL
+
+Validate artifact options:
+  --kind <kind>           agent-trace, audit, approval, discovery, ingest-error, release-manifest, release-info
+  --input <file>          JSON or JSONL artifact file
 
 Audit options:
   --input <file>          Canonical agent_trace_v1 JSONL
@@ -414,6 +420,22 @@ export function parseValidateArgs(args: string[]): ValidateOptions {
   return { input };
 }
 
+export function parseValidateArtifactArgs(args: string[]): ValidateArtifactOptions {
+  let input = "";
+  let kind = "";
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--input") input = path.resolve(requireValue(args, ++i, "--input"));
+    else if (arg === "--kind") kind = requireValue(args, ++i, "--kind");
+    else throw new Error(`Unknown validate-artifact option: ${arg}`);
+  }
+
+  if (!input) throw new Error("validate-artifact requires --input");
+  if (!isArtifactKind(kind)) throw new Error(`validate-artifact --kind must be one of: ${artifactKindList()}`);
+  return { input, kind };
+}
+
 export function parseAuditArgs(args: string[]): AuditOptions {
   let input = "";
   let output: string | undefined;
@@ -514,6 +536,14 @@ function isNormalizeSource(source: string): boolean {
 
 function normalizeSourceList(): string {
   return "auto, pi, claude-code, codex, cursor, opencode, continue, goose, openai-chat, anthropic-messages, markdown-transcript, aider";
+}
+
+function isArtifactKind(kind: string): kind is ArtifactKind {
+  return ["agent-trace", "audit", "approval", "discovery", "ingest-error", "release-manifest", "release-info"].includes(kind);
+}
+
+function artifactKindList(): string {
+  return "agent-trace, audit, approval, discovery, ingest-error, release-manifest, release-info";
 }
 
 function requireValue(args: string[], index: number, flag: string): string {

@@ -1,6 +1,6 @@
 #!/usr/bin/env node --experimental-strip-types --no-warnings=ExperimentalWarning
 
-import { parseApproveArgs, parseAuditArgs, parseCollectArgs, parseDiscoverArgs, parseGrepArgs, parseIngestArgs, parseInitArgs, parseListArgs, parseNormalizeArgs, parseNormalizeDirArgs, parseRejectArgs, parseReleaseArgs, parseRenderArgs, parseReviewArgs, parseUploadArgs, parseValidateArgs, printUsage } from "./cli.ts";
+import { parseApproveArgs, parseAuditArgs, parseCollectArgs, parseDiscoverArgs, parseGrepArgs, parseIngestArgs, parseInitArgs, parseListArgs, parseNormalizeArgs, parseNormalizeDirArgs, parseRejectArgs, parseReleaseArgs, parseRenderArgs, parseReviewArgs, parseUploadArgs, parseValidateArtifactArgs, parseValidateArgs, printUsage } from "./cli.ts";
 import { runApprove } from "./approve.ts";
 import { runAudit } from "./audit.ts";
 import { runCollect, runInit } from "./collect.ts";
@@ -14,6 +14,7 @@ import { runReject } from "./reject.ts";
 import { runReview } from "./review.ts";
 import { runUpload } from "./upload.ts";
 import { runGrep, runList } from "./query.ts";
+import { runValidateArtifact } from "./validate-artifact.ts";
 import { runValidate } from "./validate.ts";
 
 async function main(): Promise<void> {
@@ -84,6 +85,11 @@ async function main(): Promise<void> {
 
   if (command === "validate") {
     await runValidate(parseValidateArgs(args.slice(1)));
+    return;
+  }
+
+  if (command === "validate-artifact") {
+    await runValidateArtifact(parseValidateArtifactArgs(args.slice(1)));
     return;
   }
 

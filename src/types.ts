@@ -163,6 +163,20 @@ export interface ValidateOptions {
   input: string;
 }
 
+export type ArtifactKind =
+  | "agent-trace"
+  | "audit"
+  | "approval"
+  | "discovery"
+  | "ingest-error"
+  | "release-manifest"
+  | "release-info";
+
+export interface ValidateArtifactOptions {
+  input: string;
+  kind: ArtifactKind;
+}
+
 export interface AuditOptions {
   input: string;
   output?: string;

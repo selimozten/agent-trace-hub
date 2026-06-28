@@ -99,7 +99,10 @@ Validate canonical JSONL:
 
 ```bash
 agent-trace-hub validate --input canonical/session.agent_trace_v1.jsonl
+agent-trace-hub validate-artifact --kind audit --input canonical/shard-00001.audit.json
 ```
+
+`validate-artifact` supports `agent-trace`, `audit`, `approval`, `discovery`, `ingest-error`, `release-manifest`, and `release-info`.
 
 Audit a canonical shard before release:
 
@@ -226,6 +229,7 @@ npm run build
 - mixed-source manifest ingest and error reporting
 - canonical schema validation
 - artifact schema validation for discovery, ingest errors, audit, approval, and release metadata
+- user-facing `validate-artifact` coverage for every packaged schema
 - deterministic canonical audit pass/fail behavior and release gating
 - human approval artifact generation and release gating
 - canonical release packaging, manifest counts, and overwrite protection
