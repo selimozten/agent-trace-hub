@@ -13,9 +13,10 @@ import type {
   NormalizeSource,
 } from "./types.ts";
 import { validateCanonicalTrace } from "./canonical.ts";
+import { ADAPTERS } from "./source-adapters.ts";
 import { isRecord } from "./workspace.ts";
 
-interface SourceAdapter {
+export interface SourceAdapter {
   source: Exclude<NormalizeSource, "auto">;
   sourceFormat: string;
   defaultAgent: string;
@@ -27,93 +28,6 @@ type BaseTraceOverrides = Partial<CanonicalTrace["source"]> & {
   session_id?: string;
   tools?: JsonObject[];
 };
-
-const ADAPTERS: SourceAdapter[] = [
-  {
-    source: "pi",
-    sourceFormat: "pi-session-jsonl",
-    defaultAgent: "pi",
-    detect: detectPi,
-    normalize: normalizePiSession,
-  },
-  {
-    source: "claude-code",
-    sourceFormat: "claude-code-jsonl",
-    defaultAgent: "claude-code",
-    detect: detectClaudeCode,
-    normalize: normalizeClaudeCodeSession,
-  },
-  {
-    source: "codex",
-    sourceFormat: "codex-rollout-jsonl",
-    defaultAgent: "codex",
-    detect: detectCodex,
-    normalize: normalizeCodexSession,
-  },
-  {
-    source: "cursor",
-    sourceFormat: "cursor-agent-transcript-jsonl",
-    defaultAgent: "cursor",
-    detect: detectCursor,
-    normalize: normalizeCursorSession,
-  },
-  {
-    source: "anthropic-messages",
-    sourceFormat: "anthropic-messages-jsonl",
-    defaultAgent: "anthropic-compatible",
-    detect: detectAnthropicMessages,
-    normalize: normalizeAnthropicMessagesSession,
-  },
-  {
-    source: "opencode",
-    sourceFormat: "opencode-openai-compatible-jsonl",
-    defaultAgent: "opencode",
-    detect: neverAutoDetect,
-    normalize: normalizeOpenAIChatSession,
-  },
-  {
-    source: "continue",
-    sourceFormat: "continue-openai-compatible-jsonl",
-    defaultAgent: "continue",
-    detect: neverAutoDetect,
-    normalize: normalizeOpenAIChatSession,
-  },
-  {
-    source: "goose",
-    sourceFormat: "goose-openai-compatible-jsonl",
-    defaultAgent: "goose",
-    detect: neverAutoDetect,
-    normalize: normalizeOpenAIChatSession,
-  },
-  {
-    source: "openai-chat",
-    sourceFormat: "openai-chat-jsonl",
-    defaultAgent: "openai-compatible",
-    detect: detectOpenAIChat,
-    normalize: normalizeOpenAIChatSession,
-  },
-  {
-    source: "generic-json",
-    sourceFormat: "generic-json-chat",
-    defaultAgent: "generic-json",
-    detect: detectGenericJsonChat,
-    normalize: normalizeGenericJsonSession,
-  },
-  {
-    source: "aider",
-    sourceFormat: "aider-markdown-history",
-    defaultAgent: "aider",
-    detect: detectAider,
-    normalize: normalizeMarkdownTranscriptSession,
-  },
-  {
-    source: "markdown-transcript",
-    sourceFormat: "markdown-transcript",
-    defaultAgent: "markdown-transcript",
-    detect: detectMarkdownTranscript,
-    normalize: normalizeMarkdownTranscriptSession,
-  },
-];
 
 export async function runNormalize(options: NormalizeOptions): Promise<void> {
   const { source, trace } = await normalizeFileToTrace(options);
@@ -253,16 +167,16 @@ function baseTrace(
   };
 }
 
-function detectPi(records: JsonObject[]): boolean {
+export function detectPi(records: JsonObject[]): boolean {
   return records.some((record) => record.type === "session" && typeof record.version === "number" && typeof record.id === "string")
     && records.some((record) => record.type === "message" && isRecord(record.message));
 }
 
-function neverAutoDetect(_records: JsonObject[]): boolean {
+export function neverAutoDetect(_records: JsonObject[]): boolean {
   return false;
 }
 
-function normalizePiSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
+export function normalizePiSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
   const adapter = ADAPTERS[0];
   const messages: CanonicalMessage[] = [];
   let sessionId = path.basename(inputPath, ".jsonl");
@@ -293,12 +207,12 @@ function normalizePiSession(inputPath: string, records: JsonObject[], options: N
   return baseTrace(inputPath, adapter, { ...options, model }, { session_id: sessionId, cwd, exported_at: exportedAt, model, provider }, messages);
 }
 
-function detectClaudeCode(records: JsonObject[]): boolean {
+export function detectClaudeCode(records: JsonObject[]): boolean {
   return records.some((record) => typeof record.sessionId === "string" && ["user", "assistant", "system"].includes(String(record.type)))
     || records.some((record) => isRecord(record.message) && typeof record.sessionId === "string" && typeof record.cwd === "string");
 }
 
-function normalizeClaudeCodeSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
+export function normalizeClaudeCodeSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
   const adapter = ADAPTERS[1];
   const messages: CanonicalMessage[] = [];
   let sessionId = path.basename(inputPath, ".jsonl");
@@ -319,12 +233,12 @@ function normalizeClaudeCodeSession(inputPath: string, records: JsonObject[], op
   return baseTrace(inputPath, adapter, { ...options, model }, { session_id: sessionId, cwd, exported_at: exportedAt, model, provider: "anthropic" }, messages);
 }
 
-function detectCodex(records: JsonObject[]): boolean {
+export function detectCodex(records: JsonObject[]): boolean {
   return records.some((record) => record.type === "session_meta" && isRecord(record.payload))
     && records.some((record) => record.type === "response_item" && isRecord(record.payload));
 }
 
-function normalizeCodexSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
+export function normalizeCodexSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
   const adapter = ADAPTERS[2];
   const messages: CanonicalMessage[] = [];
   let pendingAssistant: CanonicalMessage | undefined;
@@ -411,11 +325,11 @@ function normalizeCodexSession(inputPath: string, records: JsonObject[], options
   return baseTrace(inputPath, adapter, { ...options, model }, { session_id: sessionId, cwd, exported_at: exportedAt, model, provider }, messages);
 }
 
-function detectCursor(records: JsonObject[]): boolean {
+export function detectCursor(records: JsonObject[]): boolean {
   return records.some((record) => typeof record.role === "string" && isRecord(record.message) && Array.isArray((record.message as JsonObject).content));
 }
 
-function normalizeCursorSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
+export function normalizeCursorSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
   const adapter = adapterFor("cursor");
   const messages: CanonicalMessage[] = [];
   let model = options.model;
@@ -434,29 +348,29 @@ function normalizeCursorSession(inputPath: string, records: JsonObject[], option
   return baseTrace(inputPath, adapter, { ...options, model }, { session_id: sessionId, model, provider: "cursor" }, messages);
 }
 
-function detectAider(records: JsonObject[]): boolean {
+export function detectAider(records: JsonObject[]): boolean {
   const text = rawText(records);
   return text !== undefined && /aider/i.test(text) && (/^####\s+/m.test(text) || /^#\s+aider chat/i.test(text));
 }
 
-function detectMarkdownTranscript(records: JsonObject[]): boolean {
+export function detectMarkdownTranscript(records: JsonObject[]): boolean {
   const text = rawText(records);
   return text !== undefined && parseMarkdownMessages(text).length > 0;
 }
 
-function normalizeMarkdownTranscriptSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
+export function normalizeMarkdownTranscriptSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
   const adapter = options.source === "aider" ? adapterFor("aider") : adapterFor("markdown-transcript");
   const text = rawText(records) ?? "";
   const messages = parseMarkdownMessages(text);
   return baseTrace(inputPath, adapter, options, { session_id: path.basename(inputPath, path.extname(inputPath)) }, messages);
 }
 
-function detectOpenAIChat(records: JsonObject[]): boolean {
+export function detectOpenAIChat(records: JsonObject[]): boolean {
   return records.some((record) => Array.isArray(record.messages))
     || records.some((record) => typeof record.role === "string" && ["system", "developer", "user", "assistant", "tool"].includes(record.role));
 }
 
-function normalizeOpenAIChatSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
+export function normalizeOpenAIChatSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
   const adapter = adapterFor(options.source === "opencode" || options.source === "continue" || options.source === "goose" ? options.source : "openai-chat");
   const root = records.length === 1 && Array.isArray(records[0].messages) ? records[0] : undefined;
   const sourceMessages = root ? recordsFromArray(records[0].messages as JsonValue[]) : records;
@@ -519,12 +433,12 @@ function normalizeOpenAIToolCall(value: JsonValue, index: number): CanonicalTool
   };
 }
 
-function detectAnthropicMessages(records: JsonObject[]): boolean {
+export function detectAnthropicMessages(records: JsonObject[]): boolean {
   return records.some((record) => Array.isArray(record.messages) && record.messages.some((item) => isRecord(item) && hasAnthropicContent(item)))
     || records.some((record) => typeof record.role === "string" && hasAnthropicContent(record));
 }
 
-function normalizeAnthropicMessagesSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
+export function normalizeAnthropicMessagesSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
   const adapter = adapterFor("anthropic-messages");
   const root = records.length === 1 && Array.isArray(records[0].messages) ? records[0] : undefined;
   const sourceMessages = root ? recordsFromArray(records[0].messages as JsonValue[]) : records;
@@ -543,11 +457,11 @@ function normalizeAnthropicMessagesSession(inputPath: string, records: JsonObjec
   return baseTrace(inputPath, adapter, { ...options, model }, { session_id: sessionId, model, provider: "anthropic", tools }, messages);
 }
 
-function detectGenericJsonChat(records: JsonObject[]): boolean {
+export function detectGenericJsonChat(records: JsonObject[]): boolean {
   return findGenericJsonMessages(records).some((message) => normalizeGenericJsonMessage(message).length > 0);
 }
 
-function normalizeGenericJsonSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
+export function normalizeGenericJsonSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
   const adapter = adapterFor("generic-json");
   const root = records.length === 1 ? records[0] : undefined;
   const sourceMessages = findGenericJsonMessages(records);

@@ -35,6 +35,13 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 | Anthropic-compatible messages | yes | yes | yes | Covers harnesses that persist Anthropic `messages` content blocks. |
 | Generic JSON chat | yes | yes | yes | Conservative fallback for nested `history`, `conversation`, `events`, `transcript`, or similar role/content exports. |
 
+## Adapter Architecture
+
+| Component | Status | Notes |
+| --- | --- | --- |
+| Source adapter registry | yes | Adapter metadata and registration live in `src/source-adapters.ts` so new harness parsers can be added without changing normalize command flow. |
+| Per-source implementation files | partial | Parser implementations still share `src/normalize.ts`; split into per-source modules as native OpenCode/Continue/Goose samples become available. |
+
 ## Next Source Adapters
 
 | Harness/source | Priority | Notes |
@@ -65,6 +72,5 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 
 ## Production Hardening
 
-- Move source adapters into separate modules once more than five are implemented.
 - Add LLM-assisted review gates for canonical shards.
 - Resolve licensing before publishing a public fork based on upstream code.
