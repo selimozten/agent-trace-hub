@@ -146,6 +146,14 @@ const approval = JSON.parse(fs.readFileSync(approvalReport, "utf-8"));
 assert(approval.schema === "agent_trace_approval_v1", "approval schema mismatch");
 assert(approval.status === "approved", "approval status mismatch");
 assert(approval.reviewer === "fixture-reviewer", "approval reviewer mismatch");
+const reviewGateReport = path.join(root, "examples/.tmp-review-gate.json");
+run([...nodeArgs, "review-gate", "--input", "examples/all.agent_trace_v1.jsonl", "--output", reviewGateReport, "--reviewer", "fixture-reviewer", "--method", "manual", "--summary", "Fixture dataset reviewed for release", "--audit-report", cleanAuditReport, "--approval-report", approvalReport]);
+run([...nodeArgs, "validate-artifact", "--kind", "review-gate", "--input", reviewGateReport]);
+assertInvalidArtifact("review-gate", { schema: "agent_trace_review_gate_v1", status: "approved" });
+const reviewGate = JSON.parse(fs.readFileSync(reviewGateReport, "utf-8"));
+assert(reviewGate.schema === "agent_trace_review_gate_v1", "review gate schema mismatch");
+assert(reviewGate.status === "approved", "review gate status mismatch");
+assert(reviewGate.input.endsWith("examples/all.agent_trace_v1.jsonl"), "review gate input mismatch");
 
 const dirtyCanonical = path.join(root, "examples/.tmp-dirty.agent_trace_v1.jsonl");
 const dirtyAuditReport = path.join(root, "examples/.tmp-audit-dirty.json");
@@ -204,6 +212,8 @@ run([
   cleanAuditReport,
   "--approval-report",
   approvalReport,
+  "--review-gate",
+  reviewGateReport,
   "--name",
   "fixture canonical traces",
   "--license",
@@ -229,6 +239,11 @@ assertCommandFails([...nodeArgs, "release", "--input", "examples/all.agent_trace
 assertCommandFails([...nodeArgs, "release", "--input", dirtyCanonical, "--output-dir", path.join(root, "examples/.tmp-release-dirty"), "--audit-report", dirtyAuditReport], "release should reject failing audit reports");
 assertCommandFails([...nodeArgs, "release", "--input", dirtyCanonical, "--output-dir", path.join(root, "examples/.tmp-release-mismatched-audit"), "--audit-report", cleanAuditReport], "release should reject audit reports for a different input");
 assertCommandFails([...nodeArgs, "release", "--input", dirtyCanonical, "--output-dir", path.join(root, "examples/.tmp-release-mismatched-approval"), "--approval-report", approvalReport], "release should reject approval reports for a different input");
+assertCommandFails([...nodeArgs, "release", "--input", dirtyCanonical, "--output-dir", path.join(root, "examples/.tmp-release-mismatched-review-gate"), "--review-gate", reviewGateReport], "release should reject review gates for a different input");
+const rejectedReviewGate = path.join(root, "examples/.tmp-review-gate-rejected.json");
+run([...nodeArgs, "review-gate", "--input", "examples/all.agent_trace_v1.jsonl", "--output", rejectedReviewGate, "--reviewer", "fixture-reviewer", "--status", "rejected", "--summary", "Fixture dataset rejected"]);
+run([...nodeArgs, "validate-artifact", "--kind", "review-gate", "--input", rejectedReviewGate]);
+assertCommandFails([...nodeArgs, "release", "--input", "examples/all.agent_trace_v1.jsonl", "--output-dir", path.join(root, "examples/.tmp-release-rejected-review-gate"), "--review-gate", rejectedReviewGate], "release should reject rejected review gates");
 assertCommandFails([...nodeArgs, "release", "--input", "examples/all.agent_trace_v1.jsonl", "--input", "examples/codex-session.agent_trace_v1.jsonl", "--output-dir", path.join(root, "examples/.tmp-release-multi-gated"), "--audit-report", cleanAuditReport], "release should reject gated multi-input releases");
 
 assertJsonl("examples/codex-session.agent_trace_v1.jsonl", (trace) => {
@@ -272,6 +287,8 @@ fs.rmSync(ingestErrors, { force: true });
 fs.rmSync(path.join(root, "examples/.tmp-ingest-fail.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(cleanAuditReport, { force: true });
 fs.rmSync(approvalReport, { force: true });
+fs.rmSync(reviewGateReport, { force: true });
+fs.rmSync(rejectedReviewGate, { force: true });
 fs.rmSync(dirtyAuditReport, { force: true });
 fs.rmSync(dirtyCanonical, { force: true });
 fs.rmSync(path.join(root, "examples/.tmp-dirty-approval.json"), { force: true });
@@ -284,6 +301,8 @@ fs.rmSync(releaseDir, { recursive: true, force: true });
 fs.rmSync(path.join(root, "examples/.tmp-release-dirty"), { recursive: true, force: true });
 fs.rmSync(path.join(root, "examples/.tmp-release-mismatched-audit"), { recursive: true, force: true });
 fs.rmSync(path.join(root, "examples/.tmp-release-mismatched-approval"), { recursive: true, force: true });
+fs.rmSync(path.join(root, "examples/.tmp-release-mismatched-review-gate"), { recursive: true, force: true });
+fs.rmSync(path.join(root, "examples/.tmp-release-rejected-review-gate"), { recursive: true, force: true });
 fs.rmSync(path.join(root, "examples/.tmp-release-multi-gated"), { recursive: true, force: true });
 fs.rmSync(tmpRawDir, { recursive: true, force: true });
 console.log("fixture verification passed");

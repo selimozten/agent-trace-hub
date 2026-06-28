@@ -34,6 +34,7 @@ Implemented:
 - `audit` for deterministic canonical release blockers, including known secrets, deny patterns, and common credential patterns
 - audit profiles for local, private, and public release policies
 - `approve` for explicit human approval artifacts tied to passing audit reports
+- `review-gate` for dataset-level manual or LLM review decisions before release
 - `render` for OpenAI chat, Anthropic messages, ChatML, ShareGPT, plain SFT text, and Ornith/Qwen XML training text
 - `enrich` for deterministic outcome signals such as commands, tests, build status, final diff availability, and user acceptance placeholders
 - `release` for packaging validated canonical shards with manifest metadata and a dataset card
@@ -136,6 +137,19 @@ agent-trace-hub approve \
 
 Approval requires a passing audit report and records reviewer, counts, audit input, and optional notes.
 
+Create a dataset-level review gate:
+
+```bash
+agent-trace-hub review-gate \
+  --input canonical/shard-00001.agent_trace_v1.jsonl \
+  --output canonical/shard-00001.review-gate.json \
+  --reviewer "@reviewer-or-llm" \
+  --method manual \
+  --summary "Reviewed for public release."
+```
+
+Use `--method llm` when the summary comes from an external LLM review workflow. Release accepts only approved review gates whose input matches the released shard.
+
 Build a local canonical dataset release directory:
 
 ```bash
@@ -144,11 +158,12 @@ agent-trace-hub release \
   --output-dir release/agent-traces \
   --audit-report canonical/shard-00001.audit.json \
   --approval-report canonical/shard-00001.approval.json \
+  --review-gate canonical/shard-00001.review-gate.json \
   --name "my coding agent traces" \
   --license other
 ```
 
-The release directory contains `data/*.agent_trace_v1.jsonl`, `manifest.jsonl`, `dataset_info.json`, `README.md`, and the canonical schema. It validates input structure and records file hashes/counts. Deterministic audit and human approval become release gates when `--audit-report` and `--approval-report` are supplied; gated releases currently require the report input to match the single released shard exactly.
+The release directory contains `data/*.agent_trace_v1.jsonl`, `manifest.jsonl`, `dataset_info.json`, `README.md`, and the canonical schema. It validates input structure and records file hashes/counts. Deterministic audit, human approval, and dataset-level review become release gates when supplied; gated releases currently require the report input to match the single released shard exactly.
 
 Render for training:
 
@@ -230,7 +245,7 @@ JSON Schema:
 
 [schema/agent_trace_v1.schema.json](schema/agent_trace_v1.schema.json)
 
-Additional artifact schemas live in `schema/` for discovery rows, ingest errors, audit reports, approval reports, release manifest entries, and release dataset info.
+Additional artifact schemas live in `schema/` for discovery rows, ingest errors, audit reports, approval reports, review gate reports, release manifest entries, and release dataset info.
 
 ## Development
 
@@ -252,6 +267,7 @@ npm run build
 - malformed artifact rejection coverage for every `validate-artifact` kind
 - deterministic canonical audit pass/fail behavior and release gating
 - human approval artifact generation and release gating
+- dataset-level review gate artifacts and release gating
 - canonical release packaging, manifest counts, and overwrite protection
 - all supported render formats
 - deterministic outcome enrichment

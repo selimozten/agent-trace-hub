@@ -1,6 +1,6 @@
 import os from "node:os";
 import path from "node:path";
-import type { ApproveOptions, ArtifactKind, AuditOptions, CollectOptions, DiscoverOptions, EnrichOptions, GrepOptions, IngestOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, ReleaseOptions, RenderOptions, ReviewOptions, UploadOptions, ValidateArtifactOptions, ValidateOptions } from "./types.ts";
+import type { ApproveOptions, ArtifactKind, AuditOptions, CollectOptions, DiscoverOptions, EnrichOptions, GrepOptions, IngestOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, ReleaseOptions, RenderOptions, ReviewGateOptions, ReviewOptions, UploadOptions, ValidateArtifactOptions, ValidateOptions } from "./types.ts";
 import { loadDenyPatterns } from "./review.ts";
 
 export function printUsage(): void {
@@ -23,6 +23,7 @@ Usage:
   agent-trace-hub validate-artifact --kind <kind> --input <file>
   agent-trace-hub audit --input <file.jsonl> [--output <file.json>] [options]
   agent-trace-hub approve --audit-report <file.json> --output <file.json> --reviewer <name> [options]
+  agent-trace-hub review-gate --input <file.jsonl> --output <file.json> --reviewer <name> --summary <text> [options]
   agent-trace-hub render --format <format> --input <file.jsonl> --output <file.jsonl>
   agent-trace-hub enrich --input <file.jsonl> --output <file.jsonl>
   agent-trace-hub release --input <file.jsonl>... --output-dir <dir> [options]
@@ -43,6 +44,7 @@ Commands:
   validate-artifact Validate any agent-trace-hub artifact against its JSON Schema
   audit     Audit canonical traces for deterministic release blockers
   approve   Create a human approval artifact from a passing audit report
+  review-gate Create a dataset-level review gate artifact
   render    Render canonical traces into model-specific training formats
   enrich    Add deterministic outcome signals to canonical traces
   release   Build a local publishable canonical dataset directory
@@ -117,7 +119,7 @@ Validate options:
   --input <file>          Canonical agent_trace_v1 JSONL
 
 Validate artifact options:
-  --kind <kind>           agent-trace, audit, approval, discovery, ingest-error, release-manifest, release-info
+  --kind <kind>           agent-trace, audit, approval, review-gate, discovery, ingest-error, release-manifest, release-info
   --input <file>          JSON or JSONL artifact file
 
 Audit options:
@@ -135,6 +137,17 @@ Approve options:
   --reviewer <name>       Human reviewer name or handle
   --notes <text>          Optional approval notes
 
+Review gate options:
+  --input <file>          Canonical agent_trace_v1 JSONL
+  --output <file.json>    Review gate report path
+  --reviewer <name>       Human or LLM reviewer name
+  --method <mode>         manual or llm (default: manual)
+  --status <status>       approved or rejected (default: approved)
+  --summary <text>        Required dataset-level review summary
+  --audit-report <file>   Optional related audit report
+  --approval-report <file> Optional related approval report
+  --notes <text>          Optional review notes
+
 Render options:
   --format <format>       Target format: openai-chat, anthropic-messages, chatml, sharegpt, sft-text, ornith-qwen-xml
   --input <file>          Canonical agent_trace_v1 JSONL
@@ -149,6 +162,7 @@ Release options:
   --output-dir <dir>      Output dataset directory
   --audit-report <file>   Require a passing agent_trace_audit_v1 report
   --approval-report <file> Require an approved agent_trace_approval_v1 report
+  --review-gate <file>    Require an approved agent_trace_review_gate_v1 report
   --name <name>           Dataset display name (default: agent-trace-hub canonical traces)
   --license <id>          Dataset license id/string (default: other)
   --force                 Replace an existing non-empty output directory
@@ -498,6 +512,44 @@ export function parseApproveArgs(args: string[]): ApproveOptions {
   return { auditReport, output, reviewer, notes };
 }
 
+export function parseReviewGateArgs(args: string[]): ReviewGateOptions {
+  let input = "";
+  let output = "";
+  let reviewer = "";
+  let method: ReviewGateOptions["method"] = "manual";
+  let status: ReviewGateOptions["status"] = "approved";
+  let summary = "";
+  let auditReport: string | undefined;
+  let approvalReport: string | undefined;
+  let notes: string | undefined;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (arg === "--input") input = path.resolve(requireValue(args, ++i, "--input"));
+    else if (arg === "--output") output = path.resolve(requireValue(args, ++i, "--output"));
+    else if (arg === "--reviewer") reviewer = requireValue(args, ++i, "--reviewer");
+    else if (arg === "--method") {
+      const value = requireValue(args, ++i, "--method");
+      if (value !== "manual" && value !== "llm") throw new Error("review-gate --method must be one of: manual, llm");
+      method = value;
+    } else if (arg === "--status") {
+      const value = requireValue(args, ++i, "--status");
+      if (value !== "approved" && value !== "rejected") throw new Error("review-gate --status must be one of: approved, rejected");
+      status = value;
+    } else if (arg === "--summary") summary = requireValue(args, ++i, "--summary");
+    else if (arg === "--audit-report") auditReport = path.resolve(requireValue(args, ++i, "--audit-report"));
+    else if (arg === "--approval-report") approvalReport = path.resolve(requireValue(args, ++i, "--approval-report"));
+    else if (arg === "--notes") notes = requireValue(args, ++i, "--notes");
+    else throw new Error(`Unknown review-gate option: ${arg}`);
+  }
+
+  if (!input) throw new Error("review-gate requires --input");
+  if (!output) throw new Error("review-gate requires --output");
+  if (!reviewer) throw new Error("review-gate requires --reviewer");
+  if (!summary) throw new Error("review-gate requires --summary");
+  return { input, output, reviewer, method, status, summary, auditReport, approvalReport, notes };
+}
+
 export function parseRenderArgs(args: string[]): RenderOptions {
   let format = "";
   let input = "";
@@ -536,6 +588,7 @@ export function parseReleaseArgs(args: string[]): ReleaseOptions {
   let outputDir = "";
   let auditReport: string | undefined;
   let approvalReport: string | undefined;
+  let reviewGate: string | undefined;
   let name: string | undefined;
   let license: string | undefined;
   let force = false;
@@ -546,6 +599,7 @@ export function parseReleaseArgs(args: string[]): ReleaseOptions {
     else if (arg === "--output-dir") outputDir = path.resolve(requireValue(args, ++i, "--output-dir"));
     else if (arg === "--audit-report") auditReport = path.resolve(requireValue(args, ++i, "--audit-report"));
     else if (arg === "--approval-report") approvalReport = path.resolve(requireValue(args, ++i, "--approval-report"));
+    else if (arg === "--review-gate") reviewGate = path.resolve(requireValue(args, ++i, "--review-gate"));
     else if (arg === "--name") name = requireValue(args, ++i, "--name");
     else if (arg === "--license") license = requireValue(args, ++i, "--license");
     else if (arg === "--force") force = true;
@@ -554,7 +608,7 @@ export function parseReleaseArgs(args: string[]): ReleaseOptions {
 
   if (inputs.length === 0) throw new Error("release requires at least one --input");
   if (!outputDir) throw new Error("release requires --output-dir");
-  return { inputs, outputDir, auditReport, approvalReport, name, license, force };
+  return { inputs, outputDir, auditReport, approvalReport, reviewGate, name, license, force };
 }
 
 function isNormalizeSource(source: string): boolean {
@@ -570,11 +624,11 @@ function normalizeSourceList(): string {
 }
 
 function isArtifactKind(kind: string): kind is ArtifactKind {
-  return ["agent-trace", "audit", "approval", "discovery", "ingest-error", "release-manifest", "release-info"].includes(kind);
+  return ["agent-trace", "audit", "approval", "review-gate", "discovery", "ingest-error", "release-manifest", "release-info"].includes(kind);
 }
 
 function artifactKindList(): string {
-  return "agent-trace, audit, approval, discovery, ingest-error, release-manifest, release-info";
+  return "agent-trace, audit, approval, review-gate, discovery, ingest-error, release-manifest, release-info";
 }
 
 function requireValue(args: string[], index: number, flag: string): string {

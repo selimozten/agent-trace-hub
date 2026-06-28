@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { loadApprovalReport, loadPassingAuditReport } from "./approve.ts";
 import { readCanonicalJsonl } from "./canonical.ts";
+import { loadApprovedReviewGate } from "./review-gate.ts";
 import type { CanonicalTrace, ReleaseDatasetInfo, ReleaseManifestEntry, ReleaseOptions } from "./types.ts";
 
 const DEFAULT_DATASET_NAME = "agent-trace-hub canonical traces";
@@ -33,10 +34,17 @@ function validateReleaseGates(options: ReleaseOptions): void {
       throw new Error(`Approval report audit input does not match release input: ${approval.audit_input} !== ${releaseInput}`);
     }
   }
+
+  if (options.reviewGate) {
+    const gate = loadApprovedReviewGate(options.reviewGate);
+    if (gate.input !== releaseInput) {
+      throw new Error(`Review gate input does not match release input: ${gate.input} !== ${releaseInput}`);
+    }
+  }
 }
 
 function singleGatedInput(options: ReleaseOptions): string {
-  if (!options.auditReport && !options.approvalReport) return options.inputs[0] ?? "";
+  if (!options.auditReport && !options.approvalReport && !options.reviewGate) return options.inputs[0] ?? "";
   if (options.inputs.length !== 1) {
     throw new Error("release gates currently require exactly one --input per audit/approval report");
   }

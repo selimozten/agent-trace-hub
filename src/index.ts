@@ -1,6 +1,6 @@
 #!/usr/bin/env node --experimental-strip-types --no-warnings=ExperimentalWarning
 
-import { parseApproveArgs, parseAuditArgs, parseCollectArgs, parseDiscoverArgs, parseEnrichArgs, parseGrepArgs, parseIngestArgs, parseInitArgs, parseListArgs, parseNormalizeArgs, parseNormalizeDirArgs, parseRejectArgs, parseReleaseArgs, parseRenderArgs, parseReviewArgs, parseUploadArgs, parseValidateArtifactArgs, parseValidateArgs, printUsage } from "./cli.ts";
+import { parseApproveArgs, parseAuditArgs, parseCollectArgs, parseDiscoverArgs, parseEnrichArgs, parseGrepArgs, parseIngestArgs, parseInitArgs, parseListArgs, parseNormalizeArgs, parseNormalizeDirArgs, parseRejectArgs, parseReleaseArgs, parseRenderArgs, parseReviewArgs, parseReviewGateArgs, parseUploadArgs, parseValidateArtifactArgs, parseValidateArgs, printUsage } from "./cli.ts";
 import { runApprove } from "./approve.ts";
 import { runAudit } from "./audit.ts";
 import { runCollect, runInit } from "./collect.ts";
@@ -10,6 +10,7 @@ import { runIngest } from "./ingest.ts";
 import { runNormalize, runNormalizeDir } from "./normalize.ts";
 import { runRelease } from "./release.ts";
 import { runRender } from "./render.ts";
+import { runReviewGate } from "./review-gate.ts";
 import { ensureStartupTools } from "./process.ts";
 import { runReject } from "./reject.ts";
 import { runReview } from "./review.ts";
@@ -101,6 +102,11 @@ async function main(): Promise<void> {
 
   if (command === "approve") {
     await runApprove(parseApproveArgs(args.slice(1)));
+    return;
+  }
+
+  if (command === "review-gate") {
+    await runReviewGate(parseReviewGateArgs(args.slice(1)));
     return;
   }
 

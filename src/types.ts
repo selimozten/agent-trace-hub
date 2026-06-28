@@ -173,6 +173,7 @@ export type ArtifactKind =
   | "agent-trace"
   | "audit"
   | "approval"
+  | "review-gate"
   | "discovery"
   | "ingest-error"
   | "release-manifest"
@@ -237,11 +238,37 @@ export interface ApprovalReport {
   notes?: string;
 }
 
+export interface ReviewGateOptions {
+  input: string;
+  output: string;
+  reviewer: string;
+  method: "manual" | "llm";
+  status: "approved" | "rejected";
+  summary: string;
+  auditReport?: string;
+  approvalReport?: string;
+  notes?: string;
+}
+
+export interface ReviewGateReport {
+  schema: "agent_trace_review_gate_v1";
+  created_at: string;
+  input: string;
+  reviewer: string;
+  method: "manual" | "llm";
+  status: "approved" | "rejected";
+  summary: string;
+  audit_report?: string;
+  approval_report?: string;
+  notes?: string;
+}
+
 export interface ReleaseOptions {
   inputs: string[];
   outputDir: string;
   auditReport?: string;
   approvalReport?: string;
+  reviewGate?: string;
   name?: string;
   license?: string;
   force: boolean;

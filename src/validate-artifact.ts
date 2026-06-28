@@ -8,6 +8,7 @@ const ARTIFACTS: Record<ArtifactKind, { schema: string; jsonl: boolean }> = {
   "agent-trace": { schema: "agent_trace_v1.schema.json", jsonl: true },
   "audit": { schema: "agent_trace_audit_v1.schema.json", jsonl: false },
   "approval": { schema: "agent_trace_approval_v1.schema.json", jsonl: false },
+  "review-gate": { schema: "agent_trace_review_gate_v1.schema.json", jsonl: false },
   "discovery": { schema: "discovered_trace_v1.schema.json", jsonl: true },
   "ingest-error": { schema: "ingest_error_v1.schema.json", jsonl: true },
   "release-manifest": { schema: "release_manifest_entry_v1.schema.json", jsonl: true },
