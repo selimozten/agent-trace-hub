@@ -83,7 +83,7 @@ function writeReleaseDataset(options: ReleaseOptions, dataset: ReleaseDataset): 
   fs.writeFileSync(path.join(options.outputDir, "manifest.jsonl"), dataset.info.files.map((entry) => JSON.stringify(entry)).join("\n") + "\n");
   fs.writeFileSync(path.join(options.outputDir, "dataset_info.json"), `${JSON.stringify(dataset.info, null, 2)}\n`);
   fs.writeFileSync(path.join(options.outputDir, "README.md"), datasetCard(dataset.info));
-  copySchema(options.outputDir);
+  copySchemas(options.outputDir);
 }
 
 function prepareOutputDir(outputDir: string, force: boolean): void {
@@ -124,12 +124,16 @@ function sha256Text(text: string): string {
   return `sha256:${createHash("sha256").update(text).digest("hex")}`;
 }
 
-function copySchema(outputDir: string): void {
-  const sourceSchema = path.resolve("schema/agent_trace_v1.schema.json");
-  if (!fs.existsSync(sourceSchema)) return;
+function copySchemas(outputDir: string): void {
+  const sourceDir = path.resolve("schema");
+  if (!fs.existsSync(sourceDir)) return;
   const targetDir = path.join(outputDir, "schema");
   fs.mkdirSync(targetDir, { recursive: true });
-  fs.copyFileSync(sourceSchema, path.join(targetDir, "agent_trace_v1.schema.json"));
+  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
+    if (entry.isFile() && entry.name.endsWith(".schema.json")) {
+      fs.copyFileSync(path.join(sourceDir, entry.name), path.join(targetDir, entry.name));
+    }
+  }
 }
 
 function datasetCard(info: ReleaseDatasetInfo): string {

@@ -10,6 +10,7 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 | Ingest discovery manifests | yes | `ingest` normalizes mixed-source discovery manifests into a canonical shard with optional error reporting. |
 | Normalize raw traces | yes | Converts supported sources into `agent_trace_v1`. |
 | Validate canonical shards | yes | Validates required canonical structure and message/tool-call invariants. |
+| Validate artifact metadata | yes | JSON Schemas cover canonical traces, discovery rows, ingest errors, audit reports, approval reports, and release metadata. |
 | Audit canonical shards | yes | `audit` performs deterministic checks for known secrets, deny patterns, common credential patterns, and image blocks. |
 | Approve canonical shards | yes | `approve` creates explicit human approval artifacts from passing audit reports. |
 | Package canonical release | yes | `release` validates canonical inputs and writes `data/`, `manifest.jsonl`, `dataset_info.json`, and a dataset card. |
@@ -63,7 +64,7 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 ## Production Hardening
 
 - Move source adapters into separate modules once more than five are implemented.
-- Add JSON Schema export for `agent_trace_v1`.
+- Add schema validation command for all artifact types.
 - Add LLM-assisted review gates for canonical shards.
 - Add configurable redaction profiles for local/private/public release modes.
 - Preserve tool schemas when source logs include them.

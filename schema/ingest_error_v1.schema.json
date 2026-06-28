@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-trace-hub.dev/schemas/ingest_error_v1.schema.json",
+  "title": "Ingest Error V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["reason"],
+  "properties": {
+    "path": { "type": "string" },
+    "source": { "type": "string" },
+    "reason": { "type": "string", "minLength": 1 }
+  }
+}

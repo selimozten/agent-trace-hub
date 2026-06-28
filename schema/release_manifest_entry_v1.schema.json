@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-trace-hub.dev/schemas/release_manifest_entry_v1.schema.json",
+  "title": "Release Manifest Entry V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["file", "source_file", "schema", "sha256", "trace_count", "message_count", "source_agents"],
+  "properties": {
+    "file": { "type": "string", "minLength": 1 },
+    "source_file": { "type": "string", "minLength": 1 },
+    "schema": { "const": "agent_trace_v1" },
+    "sha256": { "type": "string", "pattern": "^sha256:[a-f0-9]{64}$" },
+    "trace_count": { "type": "integer", "minimum": 0 },
+    "message_count": { "type": "integer", "minimum": 0 },
+    "source_agents": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    }
+  }
+}

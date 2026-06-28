@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-trace-hub.dev/schemas/agent_trace_approval_v1.schema.json",
+  "title": "Agent Trace Approval V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "created_at", "reviewer", "audit_report", "audit_input", "audit_created_at", "trace_count", "message_count", "finding_count", "blocking_finding_count", "status"],
+  "properties": {
+    "schema": { "const": "agent_trace_approval_v1" },
+    "created_at": { "type": "string", "minLength": 1 },
+    "reviewer": { "type": "string", "minLength": 1 },
+    "audit_report": { "type": "string", "minLength": 1 },
+    "audit_input": { "type": "string", "minLength": 1 },
+    "audit_created_at": { "type": "string", "minLength": 1 },
+    "trace_count": { "type": "integer", "minimum": 0 },
+    "message_count": { "type": "integer", "minimum": 0 },
+    "finding_count": { "type": "integer", "minimum": 0 },
+    "blocking_finding_count": { "type": "integer", "minimum": 0 },
+    "status": { "const": "approved" },
+    "notes": { "type": "string" }
+  }
+}

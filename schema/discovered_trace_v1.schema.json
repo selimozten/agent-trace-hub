@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-trace-hub.dev/schemas/discovered_trace_v1.schema.json",
+  "title": "Discovered Trace V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["source", "normalize_source", "path", "kind", "confidence", "reason"],
+  "properties": {
+    "source": { "$ref": "#/$defs/source" },
+    "normalize_source": { "$ref": "#/$defs/source" },
+    "path": { "type": "string", "minLength": 1 },
+    "kind": { "enum": ["jsonl", "markdown", "unknown"] },
+    "confidence": { "enum": ["high", "medium", "low"] },
+    "reason": { "type": "string" }
+  },
+  "$defs": {
+    "source": {
+      "enum": ["pi", "claude-code", "codex", "cursor", "opencode", "continue", "goose", "openai-chat", "anthropic-messages", "markdown-transcript", "aider"]
+    }
+  }
+}

@@ -208,6 +208,8 @@ JSON Schema:
 
 [schema/agent_trace_v1.schema.json](schema/agent_trace_v1.schema.json)
 
+Additional artifact schemas live in `schema/` for discovery rows, ingest errors, audit reports, approval reports, release manifest entries, and release dataset info.
+
 ## Development
 
 ```bash
@@ -223,6 +225,7 @@ npm run build
 - local trace discovery for supported harness directories
 - mixed-source manifest ingest and error reporting
 - canonical schema validation
+- artifact schema validation for discovery, ingest errors, audit, approval, and release metadata
 - deterministic canonical audit pass/fail behavior and release gating
 - human approval artifact generation and release gating
 - canonical release packaging, manifest counts, and overwrite protection

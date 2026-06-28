@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-trace-hub.dev/schemas/release_dataset_info_v1.schema.json",
+  "title": "Release Dataset Info V1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "schema", "created_at", "license", "shard_count", "trace_count", "message_count", "source_agents", "files"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "schema": { "const": "agent_trace_v1" },
+    "created_at": { "type": "string", "minLength": 1 },
+    "license": { "type": "string", "minLength": 1 },
+    "shard_count": { "type": "integer", "minimum": 0 },
+    "trace_count": { "type": "integer", "minimum": 0 },
+    "message_count": { "type": "integer", "minimum": 0 },
+    "source_agents": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "files": {
+      "type": "array",
+      "items": { "$ref": "release_manifest_entry_v1.schema.json" }
+    }
+  }
+}
