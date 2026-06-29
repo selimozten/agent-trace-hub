@@ -1,6 +1,6 @@
 # agent-trace-hub
 
-Collect, review, normalize, and publish coding-agent traces.
+Collect, review, normalize, and package coding-agent traces.
 
 This project started as a local fork of `badlogic/pi-share-hf`. The original tool has a strong safety pipeline for Pi sessions: deterministic redaction, TruffleHog scanning, deny rules, LLM review, manual rejection, and Hugging Face upload.
 
@@ -9,9 +9,9 @@ This project started as a local fork of `badlogic/pi-share-hf`. The original too
 ## Goals
 
 - ingest traces from Pi, Codex, Claude Code, OpenCode, Aider, Cursor, Continue, and similar coding agents
-- redact and review traces before release
+- redact and review traces before training or release
 - normalize provider-specific logs into `agent_trace_v1`
-- publish canonical dataset shards
+- package canonical dataset shards for private training or optional publication
 - render canonical traces into Ornith/Qwen XML, OpenAI chat, Anthropic messages, ChatML, ShareGPT, and SFT text
 
 ## Current Status
@@ -44,7 +44,7 @@ Implemented:
 Planned:
 
 - additional source adapters for OpenCode, Continue, and Goose when their native logs differ from API-shaped logs
-- dataset-level review gates for canonical public shards
+- additional training-target renderers such as TRL preference pairs and DPO/ORPO pairs
 
 ## Usage
 
@@ -145,12 +145,12 @@ agent-trace-hub review-gate \
   --output canonical/shard-00001.review-gate.json \
   --reviewer "@reviewer-or-llm" \
   --method manual \
-  --summary "Reviewed for public release."
+  --summary "Reviewed for private training."
 ```
 
 Use `--method llm` when the summary comes from an external LLM review workflow. Release accepts only approved review gates whose input matches the released shard.
 
-Build a local canonical dataset release directory:
+Build a local canonical dataset directory:
 
 ```bash
 agent-trace-hub release \
@@ -163,7 +163,7 @@ agent-trace-hub release \
   --license other
 ```
 
-The release directory contains `data/*.agent_trace_v1.jsonl`, `manifest.jsonl`, `dataset_info.json`, `README.md`, and the canonical schema. It validates input structure and records file hashes/counts. Deterministic audit, human approval, and dataset-level review become release gates when supplied; gated releases currently require the report input to match the single released shard exactly.
+The release directory contains `data/*.agent_trace_v1.jsonl`, `manifest.jsonl`, `dataset_info.json`, `README.md`, and the canonical schema. It validates input structure and records file hashes/counts. Deterministic audit, human approval, and dataset-level review become release gates when supplied; gated releases currently require the report input to match the single released shard exactly. The `--license` value is dataset metadata for packaging systems such as Hugging Face; for private/internal training, `other` is acceptable until you choose a more specific policy.
 
 Render for training:
 
@@ -274,6 +274,8 @@ npm run build
 - batch `normalize-dir`
 - Codex response-item coalescing into a single assistant turn before tool output
 
-## Publishing Note
+## Private Use
 
-The upstream repository did not include a license file at the time this local fork was created. Treat this as a private development fork until upstream licensing is clarified, or reimplement the reusable pieces cleanly in a separately licensed repository.
+This repository is set up for private/internal trace collection and model training first. Keep raw traces, canonical shards, audit reports, approvals, and rendered training data private by default.
+
+If you later decide to publish the tool or a dataset externally, do a separate redistribution review and choose explicit project and dataset licenses at that point.
