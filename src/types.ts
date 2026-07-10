@@ -96,7 +96,7 @@ export interface GrepOptions {
 export interface DiscoverOptions {
   root: string;
   output?: string;
-  source?: NormalizeSource | "all";
+  source?: NormalizeSource | "v1" | "all";
 }
 
 export interface SourcesOptions {
@@ -107,7 +107,7 @@ export interface DiscoveredTrace {
   source: Exclude<NormalizeSource, "auto">;
   normalize_source: Exclude<NormalizeSource, "auto">;
   path: string;
-  kind: "json" | "jsonl" | "markdown" | "unknown";
+  kind: "json" | "jsonl" | "sqlite" | "markdown" | "unknown";
   confidence: "high" | "medium" | "low";
   reason: string;
 }
@@ -117,7 +117,9 @@ export type NormalizeSource =
   | "pi"
   | "claude-code"
   | "codex"
+  | "omp"
   | "cursor"
+  | "cursor-agent"
   | "opencode"
   | "continue"
   | "goose"

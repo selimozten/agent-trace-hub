@@ -8,7 +8,7 @@ This project started as a local fork of `badlogic/pi-share-hf`. The original too
 
 ## Goals
 
-- ingest traces from Pi, Codex, Claude Code, OpenCode, Aider, Cursor, Continue, and similar coding agents
+- provide production-grade v1 ingestion for Claude Code, Codex, Pi, Oh My Pi (`omp`), OpenCode, and Cursor Agent CLI
 - redact and review traces before training or release
 - normalize provider-specific logs into `agent_trace_v1`
 - package canonical dataset shards for private training or optional publication
@@ -19,8 +19,11 @@ This project started as a local fork of `badlogic/pi-share-hf`. The original too
 Implemented:
 
 - inherited Pi collection/review/upload workflow
-- `normalize` adapters for Pi, Claude Code, and Codex JSONL traces
-- native `cursor` transcript adapter
+- branch-aware native Pi and Oh My Pi JSONL adapters
+- branch-aware Claude Code JSONL with streamed assistant-part coalescing and unique subagent session IDs
+- Codex rollout JSONL with mirrored-user deduplication, reasoning, function/custom tool calls, web search, and tool output
+- native `cursor-agent` transcript adapter with stable synthesized call IDs and preserved `input` arguments
+- direct read-only, multi-session extraction from the OpenCode SQLite store
 - `aider` and `markdown-transcript` adapters for markdown-style CLI histories
 - native OpenCode session-export JSON with typed message parts, reasoning, files, tools, and tool results
 - native Continue session JSON with context items, thinking, tool states, and tool output
@@ -47,8 +50,8 @@ Implemented:
 
 Planned:
 
-- source adapters for Gemini CLI, Cline/Roo Code, OpenHands, and other major harnesses
-- direct extraction from SQLite-backed OpenCode and Goose local stores
+- additional harnesses after the v1 source contract is stable
+- direct extraction from the Goose local store
 - additional training-target renderers such as TRL preference pairs and DPO/ORPO pairs
 
 ## Usage
@@ -78,14 +81,19 @@ agent-trace-hub ingest \
   --continue-on-error
 ```
 
-Supported source values:
+V1 source values:
 
 - `auto`
 - `pi`
+- `omp`
 - `claude-code`
 - `codex`
-- `cursor`
+- `cursor-agent`
 - `opencode`
+
+Extended and compatibility importers remain available:
+
+- `cursor` (legacy alias for `cursor-agent`)
 - `continue`
 - `goose`
 - `openai-chat`
@@ -94,18 +102,26 @@ Supported source values:
 - `aider`
 - `markdown-transcript`
 
-Native OpenCode and Goose stores are SQLite-backed, so use their upstream JSON export commands before normalization:
+OpenCode needs no manual export. `discover` finds `~/.local/share/opencode/opencode.db`, and `ingest` reads all non-empty sessions in one read-only SQLite transaction. A single database manifest row can therefore produce many canonical traces.
+
+The upstream JSON export remains supported for portable snapshots:
 
 ```bash
 opencode export <session-id> > raw/opencode-session.json
-
-goose session export \
-  --session-id <session-id> \
-  --format json \
-  --output raw/goose-session.json
 ```
 
-Continue CLI sessions are stored as `~/.continue/sessions/*.json` and are discovered directly. OpenCode, Continue, and Goose also retain explicit compatibility support for older OpenAI-shaped JSONL exports.
+The default `discover` scope is `--source v1`. Use `--source all` to include extended importers, or select one source explicitly.
+
+| V1 harness | Native location under `--root` |
+| --- | --- |
+| Claude Code | `.claude/projects/**/*.jsonl` |
+| Codex | `.codex/sessions/**/*.jsonl`, `.codex/rollouts/**/*.jsonl` |
+| Pi | `.pi/agent/sessions/**/*.jsonl` |
+| Oh My Pi | `.omp/agent/sessions/**/*.jsonl` |
+| OpenCode | `.local/share/opencode/opencode.db` |
+| Cursor Agent CLI | `.cursor/projects/**/agent-transcripts/**/*.jsonl` |
+
+Cursor Agent transcripts preserve prompts, assistant text, and tool requests but do not currently contain tool results. Canonical Cursor traces make this explicit with `metadata.tool_results_available: false`.
 
 Run `agent-trace-hub sources --json` to inspect the executable adapter registry. Each source is labeled `native`, `compatibility`, or `fallback`, and reports whether auto-detection is enabled.
 
@@ -113,9 +129,9 @@ Run `agent-trace-hub sources --json` to inspect the executable adapter registry.
 
 JSON and JSONL parsing is strict by default so corrupt rows cannot disappear silently. Active JSONL files are retried briefly when a writer is finishing a line, and persistent failures report the file and line number. `normalize`, `normalize-dir`, and `ingest` accept `--skip-invalid-lines` when partial recovery is intentional; the command still fails if no valid object records remain.
 
-`discover` emits a JSONL manifest of candidate trace files with `source`, `normalize_source`, `path`, `kind`, `confidence`, and `reason`. It scans known harness locations under `--root`, including Codex, Claude Code, Cursor, Continue, compatibility exports for OpenCode and Goose, Pi, and project-local Aider history files. Run the export commands above for current SQLite-backed OpenCode and Goose stores.
+`discover` emits a JSONL manifest of candidate trace files and stores with `source`, `normalize_source`, `path`, `kind`, `confidence`, and `reason`. `kind` includes `sqlite` for multi-session stores.
 
-`ingest` reads that manifest and uses each row's `normalize_source`, so one shard can contain mixed Codex, Claude Code, Cursor, Aider, OpenAI-compatible, Anthropic-compatible, generic JSON, Pi, OpenCode, Continue, and Goose exports.
+`ingest` reads that manifest and uses each row's `normalize_source`, so one shard can combine all six v1 harnesses. Extended importers can be mixed into the same canonical shard when explicitly discovered.
 
 Normalize a directory into one shard:
 
@@ -280,8 +296,9 @@ npm run build
 
 `npm test` regenerates the examples and verifies:
 
-- Pi, Claude Code, Codex, Cursor, OpenCode, Continue, Goose, Aider, Markdown transcript, OpenAI-chat, and Anthropic-message normalization
-- native OpenCode/Continue/Goose reasoning, context, tool-call, and tool-result preservation
+- v1 Pi, OMP, Claude Code, Codex, Cursor Agent, and OpenCode normalization
+- branch replay, Codex mirror deduplication, Cursor tool-input preservation, and direct OpenCode SQLite extraction
+- extended OpenCode/Continue/Goose reasoning, context, tool-call, and tool-result preservation
 - OpenCode/Continue/Goose compatibility import and native auto-detection
 - adapter registry coverage, support labels, and compatibility auto-detection invariants
 - active-writer retry, strict malformed JSON/JSONL rejection, and explicit partial JSONL recovery
@@ -298,7 +315,7 @@ npm run build
 - all supported render formats
 - deterministic outcome enrichment
 - batch `normalize-dir`
-- Codex response-item coalescing into a single assistant turn before tool output
+- Codex response-item coalescing plus custom-tool preservation
 
 ## Private Use
 

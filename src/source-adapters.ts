@@ -2,12 +2,14 @@ import type { CanonicalTrace, JsonObject, NormalizeOptions, NormalizeSource } fr
 
 export type ConcreteSource = Exclude<NormalizeSource, "auto">;
 export type AdapterSupport = "native" | "compatibility" | "fallback";
+export type AdapterTier = "v1" | "extended";
 
 export interface SourceAdapterDefinition {
   source: ConcreteSource;
   sourceFormat: string;
   defaultAgent: string;
   support: AdapterSupport;
+  tier: AdapterTier;
   autoDetect: boolean;
   description: string;
 }
@@ -27,6 +29,7 @@ export const SOURCE_ADAPTER_DEFINITIONS: readonly SourceAdapterDefinition[] = [
     sourceFormat: "pi-session-jsonl",
     defaultAgent: "pi",
     support: "native",
+    tier: "v1",
     autoDetect: true,
     description: "Pi session JSONL",
   },
@@ -35,6 +38,7 @@ export const SOURCE_ADAPTER_DEFINITIONS: readonly SourceAdapterDefinition[] = [
     sourceFormat: "claude-code-jsonl",
     defaultAgent: "claude-code",
     support: "native",
+    tier: "v1",
     autoDetect: true,
     description: "Claude Code project transcript JSONL",
   },
@@ -43,22 +47,43 @@ export const SOURCE_ADAPTER_DEFINITIONS: readonly SourceAdapterDefinition[] = [
     sourceFormat: "codex-rollout-jsonl",
     defaultAgent: "codex",
     support: "native",
+    tier: "v1",
     autoDetect: true,
     description: "Codex rollout JSONL",
+  },
+  {
+    source: "omp",
+    sourceFormat: "omp-session-jsonl",
+    defaultAgent: "omp",
+    support: "native",
+    tier: "v1",
+    autoDetect: true,
+    description: "Oh My Pi append-only session JSONL",
+  },
+  {
+    source: "cursor-agent",
+    sourceFormat: "cursor-agent-transcript-jsonl",
+    defaultAgent: "cursor-agent",
+    support: "native",
+    tier: "v1",
+    autoDetect: true,
+    description: "Cursor Agent CLI transcript JSONL",
   },
   {
     source: "cursor",
     sourceFormat: "cursor-agent-transcript-jsonl",
     defaultAgent: "cursor",
-    support: "native",
-    autoDetect: true,
-    description: "Cursor agent transcript JSONL",
+    support: "compatibility",
+    tier: "extended",
+    autoDetect: false,
+    description: "Legacy alias for Cursor Agent CLI transcripts",
   },
   {
     source: "anthropic-messages",
     sourceFormat: "anthropic-messages-jsonl",
     defaultAgent: "anthropic-compatible",
     support: "fallback",
+    tier: "extended",
     autoDetect: true,
     description: "Anthropic Messages-compatible JSON or JSONL",
   },
@@ -67,14 +92,16 @@ export const SOURCE_ADAPTER_DEFINITIONS: readonly SourceAdapterDefinition[] = [
     sourceFormat: "opencode-session-export-json",
     defaultAgent: "opencode",
     support: "native",
+    tier: "v1",
     autoDetect: true,
-    description: "OpenCode native session export JSON",
+    description: "OpenCode SQLite store or native session export JSON",
   },
   {
     source: "continue",
     sourceFormat: "continue-session-json",
     defaultAgent: "continue",
     support: "native",
+    tier: "extended",
     autoDetect: true,
     description: "Continue native session JSON",
   },
@@ -83,6 +110,7 @@ export const SOURCE_ADAPTER_DEFINITIONS: readonly SourceAdapterDefinition[] = [
     sourceFormat: "goose-session-export-json",
     defaultAgent: "goose",
     support: "native",
+    tier: "extended",
     autoDetect: true,
     description: "Goose native session export JSON",
   },
@@ -91,6 +119,7 @@ export const SOURCE_ADAPTER_DEFINITIONS: readonly SourceAdapterDefinition[] = [
     sourceFormat: "openai-chat-jsonl",
     defaultAgent: "openai-compatible",
     support: "fallback",
+    tier: "extended",
     autoDetect: true,
     description: "OpenAI Chat Completions-compatible JSON or JSONL",
   },
@@ -99,6 +128,7 @@ export const SOURCE_ADAPTER_DEFINITIONS: readonly SourceAdapterDefinition[] = [
     sourceFormat: "generic-json-chat",
     defaultAgent: "generic-json",
     support: "fallback",
+    tier: "extended",
     autoDetect: true,
     description: "Generic nested role/content JSON or JSONL",
   },
@@ -107,6 +137,7 @@ export const SOURCE_ADAPTER_DEFINITIONS: readonly SourceAdapterDefinition[] = [
     sourceFormat: "aider-markdown-history",
     defaultAgent: "aider",
     support: "native",
+    tier: "extended",
     autoDetect: true,
     description: "Aider markdown chat history",
   },
@@ -115,6 +146,7 @@ export const SOURCE_ADAPTER_DEFINITIONS: readonly SourceAdapterDefinition[] = [
     sourceFormat: "markdown-transcript",
     defaultAgent: "markdown-transcript",
     support: "fallback",
+    tier: "extended",
     autoDetect: true,
     description: "Role-heading markdown transcript",
   },
@@ -165,6 +197,10 @@ export function isConcreteSource(source: string): source is ConcreteSource {
 
 export function normalizeSourceList(): string {
   return ["auto", ...SOURCE_ADAPTER_DEFINITIONS.map((definition) => definition.source)].join(", ");
+}
+
+export function isV1Source(source: ConcreteSource): boolean {
+  return SOURCE_ADAPTER_DEFINITIONS.some((definition) => definition.source === source && definition.tier === "v1");
 }
 
 function validateDefinitions(definitions: readonly SourceAdapterDefinition[]): readonly SourceAdapterDefinition[] {

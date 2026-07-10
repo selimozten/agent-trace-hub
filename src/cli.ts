@@ -17,7 +17,7 @@ Usage:
   agent-trace-hub list [--workspace <dir>] --uploadable
   agent-trace-hub grep [--workspace <dir>] [--ignore-case] <pattern>
   agent-trace-hub sources [--json]
-  agent-trace-hub discover [--root <dir>] [--source <source>|all] [--output <file.jsonl>]
+  agent-trace-hub discover [--root <dir>] [--source v1|all|<source>] [--output <file.jsonl>]
   agent-trace-hub ingest --manifest <file.jsonl> --output <file.jsonl> [options]
   agent-trace-hub normalize --source <source> --input <file.jsonl> --output <file.jsonl> [options]
   agent-trace-hub normalize-dir --source <source> --input-dir <dir> --output <file.jsonl> [options]
@@ -104,7 +104,7 @@ Sources options:
 
 Discover options:
   --root <dir>            Home/root directory to scan (default: ~)
-  --source <source>|all   Limit discovery to one source (default: all)
+  --source v1|all|<source> Limit discovery (default: v1)
   --output <file.jsonl>   Write JSONL manifest instead of stdout
 
 Ingest options:
@@ -115,7 +115,7 @@ Ingest options:
   --skip-invalid-lines    Partially recover files containing malformed JSONL rows
 
 Normalize options:
-  --source <source>       Input source format: auto, pi, claude-code, codex, cursor, opencode, continue, goose, openai-chat, anthropic-messages, generic-json, markdown-transcript, aider
+  --source <source>       Input source format; run sources for the complete list
   --input <file>          Source session file
   --output <file>         Output canonical agent_trace_v1 JSONL
   --input-dir <dir>       Source directory for normalize-dir
@@ -345,7 +345,7 @@ export function parseGrepArgs(args: string[]): GrepOptions {
 
 export function parseDiscoverArgs(args: string[]): DiscoverOptions {
   let root = os.homedir();
-  let source: DiscoverOptions["source"] = "all";
+  let source: DiscoverOptions["source"] = "v1";
   let output: string | undefined;
 
   for (let i = 0; i < args.length; i++) {
@@ -353,8 +353,8 @@ export function parseDiscoverArgs(args: string[]): DiscoverOptions {
     if (arg === "--root") root = path.resolve(requireValue(args, ++i, "--root"));
     else if (arg === "--source") {
       const value = requireValue(args, ++i, "--source");
-      if (value !== "all" && !isNormalizeSource(value)) {
-        throw new Error(`discover --source must be all or one of: ${normalizeSourceList()}`);
+      if (value !== "v1" && value !== "all" && !isNormalizeSource(value)) {
+        throw new Error(`discover --source must be v1, all, or one of: ${normalizeSourceList()}`);
       }
       source = value as DiscoverOptions["source"];
     } else if (arg === "--output") output = path.resolve(requireValue(args, ++i, "--output"));
@@ -362,7 +362,7 @@ export function parseDiscoverArgs(args: string[]): DiscoverOptions {
   }
 
   if (source === "auto") {
-    throw new Error("discover --source does not accept auto; use all or a concrete source");
+    throw new Error("discover --source does not accept auto; use v1, all, or a concrete source");
   }
 
   return { root, source, output };

@@ -1,6 +1,7 @@
 import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 
 const root = process.cwd();
 const nodeArgs = ["--experimental-strip-types", "src/index.ts"];
@@ -9,6 +10,8 @@ const fixtures = [
   ["pi", "examples/pi-session.jsonl", "examples/pi-session.agent_trace_v1.jsonl"],
   ["claude-code", "examples/claude-code-session.jsonl", "examples/claude-code-session.agent_trace_v1.jsonl"],
   ["codex", "examples/codex-session.jsonl", "examples/codex-session.agent_trace_v1.jsonl"],
+  ["omp", "examples/omp-session.jsonl", "examples/omp-session.agent_trace_v1.jsonl"],
+  ["cursor-agent", "examples/cursor-session.jsonl", "examples/cursor-agent-session.agent_trace_v1.jsonl"],
   ["cursor", "examples/cursor-session.jsonl", "examples/cursor-session.agent_trace_v1.jsonl"],
   ["opencode", "examples/opencode-session.json", "examples/opencode-session.agent_trace_v1.jsonl"],
   ["continue", "examples/continue-session.json", "examples/continue-session.agent_trace_v1.jsonl"],
@@ -30,11 +33,13 @@ assert(sourceRegistry.length === fixtures.length, "source registry and normaliza
 for (const [source] of fixtures) {
   assert(sourceRegistry.some((entry) => entry.source === source), `source registry missing ${source}`);
 }
-for (const source of ["opencode", "continue", "goose"]) {
+for (const source of ["pi", "claude-code", "codex", "omp", "cursor-agent", "opencode"]) {
   const entry = sourceRegistry.find((candidate) => candidate.source === source);
-  assert(entry.support === "native", `${source} should be labeled as native support`);
-  assert(entry.autoDetect === true, `${source} native adapter should auto-detect its export`);
+  assert(entry.tier === "v1", `${source} should be labeled as a v1 adapter`);
+  assert(entry.support === "native", `${source} should have native support`);
+  assert(entry.autoDetect === true, `${source} should auto-detect native inputs`);
 }
+assert(sourceRegistry.find((entry) => entry.source === "cursor")?.support === "compatibility", "cursor should remain an explicit compatibility alias");
 
 const nativeOpenCode = readJsonl(path.join(root, "examples/opencode-session.agent_trace_v1.jsonl"))[0];
 assert(nativeOpenCode.source.source_format === "opencode-session-export-json", "OpenCode native source format mismatch");
@@ -54,6 +59,21 @@ assert(nativeGoose.messages.some((message) => message.reasoning?.[0]?.text.inclu
 assert(nativeGoose.messages.some((message) => message.tool_calls?.[0]?.name === "shell"), "Goose tool request should be preserved");
 assert(nativeGoose.messages.some((message) => message.role === "tool" && message.tool_call_id === "call_goose_1"), "Goose tool response should be preserved");
 
+const nativeOmp = readJsonl(path.join(root, "examples/omp-session.agent_trace_v1.jsonl"))[0];
+assert(nativeOmp.source.source_format === "omp-session-jsonl", "OMP native source format mismatch");
+assert(nativeOmp.source.provider === "anthropic" && nativeOmp.source.model === "claude-omp-example", "OMP model route should be split into provider and model");
+assert(nativeOmp.messages.some((message) => message.tool_calls?.[0]?.arguments?.command === "npm test -- parser"), "OMP tool arguments should be preserved");
+
+const openCodeDatabase = path.join(root, "examples/.tmp-opencode.db");
+const openCodeDatabaseOutput = path.join(root, "examples/.tmp-opencode-db.agent_trace_v1.jsonl");
+createOpenCodeDatabase(openCodeDatabase);
+run([...nodeArgs, "normalize", "--source", "opencode", "--input", openCodeDatabase, "--output", openCodeDatabaseOutput]);
+run([...nodeArgs, "validate", "--input", openCodeDatabaseOutput]);
+const databaseTraces = readJsonl(openCodeDatabaseOutput);
+assert(databaseTraces.length === 1, "OpenCode SQLite normalization should skip empty sessions");
+assert(databaseTraces[0].source.source_format === "opencode-sqlite", "OpenCode SQLite source format mismatch");
+assert(databaseTraces[0].messages.some((message) => message.tool_calls?.[0]?.name === "shell"), "OpenCode SQLite tool call should be preserved");
+
 const compatibilityOutputs = [];
 for (const source of ["opencode", "continue", "goose"]) {
   const output = path.join(root, `examples/.tmp-${source}-compat.agent_trace_v1.jsonl`);
@@ -69,6 +89,7 @@ run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/anthropi
 run([...nodeArgs, "validate", "--input", "examples/anthropic-messages-session.auto.agent_trace_v1.jsonl"]);
 run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/cursor-session.jsonl", "--output", "examples/cursor-session.auto.agent_trace_v1.jsonl"]);
 run([...nodeArgs, "validate", "--input", "examples/cursor-session.auto.agent_trace_v1.jsonl"]);
+assert(readJsonl(path.join(root, "examples/cursor-session.auto.agent_trace_v1.jsonl"))[0].source.agent === "cursor-agent", "Cursor Agent should be selected by auto-detection");
 run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/generic-json-session.json", "--output", "examples/generic-json-session.auto.agent_trace_v1.jsonl"]);
 run([...nodeArgs, "validate", "--input", "examples/generic-json-session.auto.agent_trace_v1.jsonl"]);
 run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/aider-history.md", "--output", "examples/aider-history.auto.agent_trace_v1.jsonl"]);
@@ -153,45 +174,61 @@ fs.mkdirSync(path.join(discoverRoot, ".codex/sessions/2026/06/29"), { recursive:
 fs.mkdirSync(path.join(discoverRoot, ".claude/projects/example"), { recursive: true });
 fs.mkdirSync(path.join(discoverRoot, ".claude/projects/example/subagents/workflows/wf_fixture"), { recursive: true });
 fs.mkdirSync(path.join(discoverRoot, ".cursor/projects/example/agent-transcripts/session"), { recursive: true });
-fs.mkdirSync(path.join(discoverRoot, ".local/share/opencode/sessions"), { recursive: true });
+fs.mkdirSync(path.join(discoverRoot, ".local/share/opencode"), { recursive: true });
 fs.mkdirSync(path.join(discoverRoot, ".continue/sessions"), { recursive: true });
 fs.mkdirSync(path.join(discoverRoot, ".config/goose/sessions"), { recursive: true });
-fs.mkdirSync(path.join(discoverRoot, ".pi/sessions"), { recursive: true });
+fs.mkdirSync(path.join(discoverRoot, ".omp/agent/sessions/project"), { recursive: true });
+fs.mkdirSync(path.join(discoverRoot, ".pi/agent/sessions/project"), { recursive: true });
 for (const file of [
   ".codex/sessions/2026/06/29/session.jsonl",
   ".claude/projects/example/session.jsonl",
   ".cursor/projects/example/agent-transcripts/session/transcript.jsonl",
-  ".local/share/opencode/sessions/session.jsonl",
   ".continue/sessions/session.json",
   ".config/goose/sessions/session.jsonl",
-  ".pi/sessions/session.jsonl",
+  ".omp/agent/sessions/project/session.jsonl",
+  ".pi/agent/sessions/project/session.jsonl",
 ]) {
   fs.writeFileSync(path.join(discoverRoot, file), "{}\n");
 }
+createOpenCodeDatabase(path.join(discoverRoot, ".local/share/opencode/opencode.db"));
 fs.writeFileSync(path.join(discoverRoot, ".aider.chat.history.md"), "#### user\n\nhello\n");
 fs.writeFileSync(path.join(discoverRoot, ".claude/projects/example/subagents/workflows/wf_fixture/events.jsonl"), `${JSON.stringify({ type: "started", agentId: "fixture", key: "fixture-key" })}\n`);
 run([...nodeArgs, "discover", "--root", discoverRoot, "--output", discoverOutput]);
 run([...nodeArgs, "validate-artifact", "--kind", "discovery", "--input", discoverOutput]);
 assertInvalidArtifact("discovery", [{ source: "codex", path: "missing-normalize-source.jsonl", kind: "jsonl", confidence: "high", reason: "fixture" }]);
 const discovered = readJsonl(discoverOutput);
-assert(discovered.length === 8, "discover should exclude Claude workflow telemetry JSONL");
-for (const source of ["aider", "claude-code", "codex", "continue", "cursor", "goose", "opencode", "pi"]) {
+assert(discovered.length === 6, "default discovery should return only the six v1 harnesses");
+for (const source of ["claude-code", "codex", "cursor-agent", "omp", "opencode", "pi"]) {
   assert(discovered.some((entry) => entry.source === source && entry.normalize_source === source), `discover missing ${source}`);
 }
-const cursorOnly = execFileSync(process.execPath, [...nodeArgs, "discover", "--root", discoverRoot, "--source", "cursor"], { cwd: root, encoding: "utf-8" })
+assert(discovered.some((entry) => entry.source === "opencode" && entry.kind === "sqlite"), "OpenCode database should be discovered as SQLite");
+const allDiscovered = execFileSync(process.execPath, [...nodeArgs, "discover", "--root", discoverRoot, "--source", "all"], { cwd: root, encoding: "utf-8" })
   .trim()
   .split("\n")
   .filter(Boolean)
   .map((line) => JSON.parse(line));
-assert(cursorOnly.length === 1 && cursorOnly[0].source === "cursor", "discover --source cursor should only return cursor");
+assert(allDiscovered.length === 9, "discover --source all should include extended adapters and exclude Claude telemetry");
+const cursorOnly = execFileSync(process.execPath, [...nodeArgs, "discover", "--root", discoverRoot, "--source", "cursor-agent"], { cwd: root, encoding: "utf-8" })
+  .trim()
+  .split("\n")
+  .filter(Boolean)
+  .map((line) => JSON.parse(line));
+assert(cursorOnly.length === 1 && cursorOnly[0].source === "cursor-agent", "discover --source cursor-agent should only return Cursor Agent");
+const cursorAlias = execFileSync(process.execPath, [...nodeArgs, "discover", "--root", discoverRoot, "--source", "cursor"], { cwd: root, encoding: "utf-8" })
+  .trim()
+  .split("\n")
+  .filter(Boolean)
+  .map((line) => JSON.parse(line));
+assert(cursorAlias.length === 1 && cursorAlias[0].source === "cursor-agent", "discover --source cursor should resolve the compatibility alias");
 
 const ingestManifest = path.join(root, "examples/.tmp-ingest-manifest.jsonl");
 const ingestOutput = path.join(root, "examples/.tmp-ingested.agent_trace_v1.jsonl");
 const ingestEntries = [
   ["codex", "examples/codex-session.jsonl"],
-  ["cursor", "examples/cursor-session.jsonl"],
+  ["cursor-agent", "examples/cursor-session.jsonl"],
   ["opencode", "examples/opencode-session.json"],
   ["aider", "examples/aider-history.md"],
+  ["opencode", "examples/.tmp-opencode.db"],
 ].map(([source, file]) => ({
   source,
   normalize_source: source,
@@ -204,7 +241,7 @@ fs.writeFileSync(ingestManifest, ingestEntries.map((entry) => JSON.stringify(ent
 run([...nodeArgs, "ingest", "--manifest", ingestManifest, "--output", ingestOutput]);
 run([...nodeArgs, "validate", "--input", ingestOutput]);
 const ingested = readJsonl(ingestOutput);
-assert(ingested.length === 4, "ingest should normalize all fixture manifest entries");
+assert(ingested.length === 5, "ingest should normalize all fixture manifest entries, including SQLite stores");
 assert(ingested.some((trace) => trace.source.agent === "opencode"), "ingest should preserve opencode source");
 
 const ingestErrorManifest = path.join(root, "examples/.tmp-ingest-errors-manifest.jsonl");
@@ -230,7 +267,7 @@ const cleanAudit = JSON.parse(fs.readFileSync(cleanAuditReport, "utf-8"));
 assert(cleanAudit.schema === "agent_trace_audit_v1", "audit schema mismatch");
 assert(cleanAudit.profile === "private", "audit default profile mismatch");
 assert(cleanAudit.status === "pass", "clean audit should pass");
-assert(cleanAudit.trace_count === 12, "clean audit trace count mismatch");
+assert(cleanAudit.trace_count === 13, "clean audit trace count mismatch");
 const approvalReport = path.join(root, "examples/.tmp-approval.json");
 run([...nodeArgs, "approve", "--audit-report", cleanAuditReport, "--output", approvalReport, "--reviewer", "fixture-reviewer", "--notes", "fixture approved"]);
 run([...nodeArgs, "validate-artifact", "--kind", "approval", "--input", approvalReport]);
@@ -319,14 +356,14 @@ assertInvalidArtifact("release-info", { name: "x", schema: "agent_trace_v1", cre
 const releaseManifest = readJsonl(path.join(releaseDir, "manifest.jsonl"));
 const releaseInfo = JSON.parse(fs.readFileSync(path.join(releaseDir, "dataset_info.json"), "utf-8"));
 assert(releaseManifest.length === 1, "release should create one shard manifest entry");
-assert(releaseManifest[0].trace_count === 12, "release manifest trace count mismatch");
+assert(releaseManifest[0].trace_count === 13, "release manifest trace count mismatch");
 assert(releaseManifest[0].message_count > 0, "release manifest should count messages");
 assert(releaseManifest[0].sha256.startsWith("sha256:"), "release manifest should include sha256");
 assert(fs.existsSync(path.join(releaseDir, releaseManifest[0].file)), "release shard missing");
 assert(fs.existsSync(path.join(releaseDir, "schema/agent_trace_v1.schema.json")), "release schema missing");
 assert(fs.existsSync(path.join(releaseDir, "schema/agent_trace_audit_v1.schema.json")), "release audit schema missing");
 assert(releaseInfo.name === "fixture canonical traces", "release dataset name mismatch");
-assert(releaseInfo.trace_count === 12, "release dataset trace count mismatch");
+assert(releaseInfo.trace_count === 13, "release dataset trace count mismatch");
 assert(releaseInfo.source_agents.codex === 1, "release source agent counts missing codex");
 assertCommandFails([...nodeArgs, "release", "--input", "examples/all.agent_trace_v1.jsonl", "--output-dir", releaseDir], "release should refuse non-empty output without --force");
 assertCommandFails([...nodeArgs, "release", "--input", dirtyCanonical, "--output-dir", path.join(root, "examples/.tmp-release-dirty"), "--audit-report", dirtyAuditReport], "release should reject failing audit reports");
@@ -341,8 +378,25 @@ assertCommandFails([...nodeArgs, "release", "--input", "examples/all.agent_trace
 
 assertJsonl("examples/codex-session.agent_trace_v1.jsonl", (trace) => {
   assert(trace.schema === "agent_trace_v1", "schema mismatch");
-  assert(trace.messages.length === 3, "codex fixture should coalesce to 3 messages");
+  assert(trace.messages.length === 5, "codex fixture should preserve standard and custom tool turns");
+  assert(trace.messages.filter((message) => message.role === "user").length === 1, "codex mirrored user events should be deduplicated");
   assert(trace.messages[1].tool_calls?.[0]?.arguments?.cmd === "pytest -q", "codex tool args not parsed");
+  assert(trace.messages.some((message) => message.tool_calls?.[0]?.name === "apply_patch"), "codex custom tool call missing");
+});
+assertJsonl("examples/claude-code-session.agent_trace_v1.jsonl", (trace) => {
+  assert(trace.messages.length === 3, "Claude streamed assistant chunks should be coalesced");
+  assert(!JSON.stringify(trace).includes("abandoned branch"), "Claude abandoned branch should be excluded");
+  assert(trace.messages[1].reasoning?.[0]?.text.includes("inspect"), "Claude thinking should be preserved");
+});
+assertJsonl("examples/pi-session.agent_trace_v1.jsonl", (trace) => {
+  assert(!JSON.stringify(trace).includes("Abandoned branch"), "Pi abandoned branch should be excluded");
+  assert(trace.metadata.active_leaf_id === "tool-1", "Pi active journal leaf should be recorded");
+});
+assertJsonl("examples/cursor-agent-session.agent_trace_v1.jsonl", (trace) => {
+  const calls = trace.messages.flatMap((message) => message.tool_calls ?? []);
+  assert(calls[0]?.arguments?.command === "pytest -q", "Cursor Agent input arguments should be preserved");
+  assert(new Set(calls.map((call) => call.id)).size === calls.length, "Cursor Agent synthesized tool IDs should be unique");
+  assert(trace.metadata.tool_results_available === false, "Cursor Agent source limitation should be explicit");
 });
 assertJsonl("examples/openai-chat-session.agent_trace_v1.jsonl", (trace) => {
   assert(trace.tools.length === 1, "OpenAI fixture should preserve tool schemas");
@@ -386,6 +440,8 @@ fs.rmSync(ingestErrorManifest, { force: true });
 fs.rmSync(ingestErrorOutput, { force: true });
 fs.rmSync(ingestErrors, { force: true });
 fs.rmSync(path.join(root, "examples/.tmp-ingest-fail.agent_trace_v1.jsonl"), { force: true });
+fs.rmSync(openCodeDatabase, { force: true });
+fs.rmSync(openCodeDatabaseOutput, { force: true });
 fs.rmSync(cleanAuditReport, { force: true });
 fs.rmSync(approvalReport, { force: true });
 fs.rmSync(reviewGateReport, { force: true });
@@ -407,6 +463,80 @@ fs.rmSync(path.join(root, "examples/.tmp-release-rejected-review-gate"), { recur
 fs.rmSync(path.join(root, "examples/.tmp-release-multi-gated"), { recursive: true, force: true });
 fs.rmSync(tmpRawDir, { recursive: true, force: true });
 console.log("fixture verification passed");
+
+function createOpenCodeDatabase(file) {
+  fs.rmSync(file, { force: true });
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const database = new DatabaseSync(file);
+  database.exec(`
+    CREATE TABLE session (
+      id TEXT PRIMARY KEY, project_id TEXT NOT NULL, workspace_id TEXT, parent_id TEXT,
+      slug TEXT NOT NULL, directory TEXT NOT NULL, path TEXT, title TEXT NOT NULL,
+      agent TEXT, model TEXT, version TEXT NOT NULL, summary_additions INTEGER,
+      summary_deletions INTEGER, summary_files INTEGER, summary_diffs TEXT, metadata TEXT,
+      cost REAL NOT NULL DEFAULT 0, tokens_input INTEGER NOT NULL DEFAULT 0,
+      tokens_output INTEGER NOT NULL DEFAULT 0, tokens_reasoning INTEGER NOT NULL DEFAULT 0,
+      tokens_cache_read INTEGER NOT NULL DEFAULT 0, tokens_cache_write INTEGER NOT NULL DEFAULT 0,
+      time_created INTEGER NOT NULL, time_updated INTEGER NOT NULL, time_compacting INTEGER,
+      time_archived INTEGER
+    );
+    CREATE TABLE message (
+      id TEXT PRIMARY KEY, session_id TEXT NOT NULL, time_created INTEGER NOT NULL,
+      time_updated INTEGER NOT NULL, data TEXT NOT NULL
+    );
+    CREATE TABLE part (
+      id TEXT PRIMARY KEY, message_id TEXT NOT NULL, session_id TEXT NOT NULL,
+      time_created INTEGER NOT NULL, time_updated INTEGER NOT NULL, data TEXT NOT NULL
+    );
+  `);
+  const insertSession = database.prepare(`
+    INSERT INTO session (
+      id, project_id, workspace_id, parent_id, slug, directory, path, title, agent, model,
+      version, summary_additions, summary_deletions, summary_files, summary_diffs, metadata,
+      cost, tokens_input, tokens_output, tokens_reasoning, tokens_cache_read,
+      tokens_cache_write, time_created, time_updated, time_compacting, time_archived
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  insertSession.run(
+    "example-opencode-db-session", "example-project", null, null, "db-session",
+    "/redacted/opencode-db-project", null, "Database session", "build",
+    JSON.stringify({ id: "qwen-coder-example", providerID: "openai" }), "1.17.8",
+    1, 0, 1, null, JSON.stringify({ fixture: true }), 0.01, 10, 20, 5, 0, 0,
+    1782720000000, 1782720060000, null, null,
+  );
+  insertSession.run(
+    "example-opencode-empty-session", "example-project", null, null, "empty-session",
+    "/redacted/opencode-db-project", null, "Empty session", "build", null, "1.17.8",
+    null, null, null, null, null, 0, 0, 0, 0, 0, 0,
+    1782720100000, 1782720100000, null, null,
+  );
+
+  const insertMessage = database.prepare("INSERT INTO message (id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?)");
+  insertMessage.run("msg_db_user", "example-opencode-db-session", 1782720001000, 1782720001000, JSON.stringify({
+    role: "user",
+    time: { created: 1782720001000 },
+    model: { id: "qwen-coder-example", providerID: "openai" },
+  }));
+  insertMessage.run("msg_db_assistant", "example-opencode-db-session", 1782720002000, 1782720005000, JSON.stringify({
+    role: "assistant",
+    parentID: "msg_db_user",
+    modelID: "qwen-coder-example",
+    providerID: "openai",
+    time: { created: 1782720002000, completed: 1782720005000 },
+  }));
+
+  const insertPart = database.prepare("INSERT INTO part (id, message_id, session_id, time_created, time_updated, data) VALUES (?, ?, ?, ?, ?, ?)");
+  insertPart.run("prt_db_1", "msg_db_user", "example-opencode-db-session", 1782720001000, 1782720001000, JSON.stringify({ type: "text", text: "Inspect the failing command." }));
+  insertPart.run("prt_db_2", "msg_db_assistant", "example-opencode-db-session", 1782720002000, 1782720002000, JSON.stringify({ type: "reasoning", text: "I should run the focused command first." }));
+  insertPart.run("prt_db_3", "msg_db_assistant", "example-opencode-db-session", 1782720003000, 1782720003000, JSON.stringify({ type: "text", text: "I will run the focused command." }));
+  insertPart.run("prt_db_4", "msg_db_assistant", "example-opencode-db-session", 1782720004000, 1782720005000, JSON.stringify({
+    type: "tool",
+    callID: "call_db_1",
+    tool: "shell",
+    state: { status: "completed", input: { cmd: "npm test" }, output: "1 failed" },
+  }));
+  database.close();
+}
 
 function run(args) {
   execFileSync(process.execPath, args, { cwd: root, stdio: "inherit" });

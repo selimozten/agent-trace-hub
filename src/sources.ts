@@ -7,8 +7,8 @@ export function runSources(options: SourcesOptions): void {
     return;
   }
 
-  console.log("SOURCE\tSUPPORT\tDETECTION\tDESCRIPTION");
+  console.log("SOURCE\tTIER\tSUPPORT\tDETECTION\tDESCRIPTION");
   for (const adapter of SOURCE_ADAPTER_DEFINITIONS) {
-    console.log(`${adapter.source}\t${adapter.support}\t${adapter.autoDetect ? "auto" : "explicit"}\t${adapter.description}`);
+    console.log(`${adapter.source}\t${adapter.tier}\t${adapter.support}\t${adapter.autoDetect ? "auto" : "explicit"}\t${adapter.description}`);
   }
 }

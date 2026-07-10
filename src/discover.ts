@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { isV1Source } from "./source-adapters.ts";
 import type { DiscoverOptions, DiscoveredTrace, NormalizeSource } from "./types.ts";
 import { isRecord } from "./workspace.ts";
 
@@ -40,23 +41,23 @@ const DISCOVERY_PATTERNS: DiscoveryPattern[] = [
     exclude: isClaudeWorkflowTelemetry,
   },
   {
-    source: "cursor",
-    normalizeSource: "cursor",
+    source: "cursor-agent",
+    normalizeSource: "cursor-agent",
     roots: [".cursor/projects"],
     extensions: [".jsonl"],
     kind: "jsonl",
     confidence: "high",
-    reason: "Cursor agent transcript JSONL directory",
+    reason: "Cursor Agent CLI transcript JSONL directory",
     requirePathPart: "agent-transcripts",
   },
   {
     source: "opencode",
     normalizeSource: "opencode",
-    roots: [".local/share/opencode", ".config/opencode"],
-    extensions: [".jsonl"],
-    kind: "jsonl",
-    confidence: "medium",
-    reason: "OpenCode local/export JSONL candidate",
+    exactFiles: [".local/share/opencode/opencode.db"],
+    extensions: [".db"],
+    kind: "sqlite",
+    confidence: "high",
+    reason: "OpenCode native SQLite session store",
   },
   {
     source: "continue",
@@ -86,13 +87,22 @@ const DISCOVERY_PATTERNS: DiscoveryPattern[] = [
     reason: "Goose local/export JSONL candidate",
   },
   {
-    source: "pi",
-    normalizeSource: "pi",
-    roots: [".pi/sessions"],
+    source: "omp",
+    normalizeSource: "omp",
+    roots: [".omp/agent/sessions", ".omp/sessions"],
     extensions: [".jsonl"],
     kind: "jsonl",
-    confidence: "medium",
-    reason: "Pi session JSONL directory",
+    confidence: "high",
+    reason: "Oh My Pi native session JSONL directory",
+  },
+  {
+    source: "pi",
+    normalizeSource: "pi",
+    roots: [".pi/agent/sessions", ".pi/sessions"],
+    extensions: [".jsonl"],
+    kind: "jsonl",
+    confidence: "high",
+    reason: "Pi native session JSONL directory",
   },
   {
     source: "aider",
@@ -134,10 +144,14 @@ export async function runDiscover(options: DiscoverOptions): Promise<void> {
 
 export function discoverTraces(options: DiscoverOptions): DiscoveredTrace[] {
   const root = path.resolve(options.root);
-  const sourceFilter = options.source && options.source !== "all" ? options.source : undefined;
+  const requestedSource = options.source ?? "v1";
+  const sourceFilter = requestedSource === "cursor"
+    ? "cursor-agent"
+    : requestedSource !== "all" && requestedSource !== "v1" ? requestedSource : undefined;
   const discovered: DiscoveredTrace[] = [];
 
   for (const pattern of DISCOVERY_PATTERNS) {
+    if (requestedSource === "v1" && !isV1Source(pattern.source)) continue;
     if (sourceFilter && pattern.source !== sourceFilter) continue;
     for (const file of exactFiles(root, pattern)) {
       discovered.push(toDiscoveredTrace(file, pattern));

@@ -2,6 +2,9 @@
   "name": "agent-trace-hub",
   "version": "0.1.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.6.0"
+  },
   "bin": {
     "agent-trace-hub": "dist/index.js",
     "ath": "dist/index.js"

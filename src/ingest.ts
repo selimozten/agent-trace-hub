@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
-import { normalizeFileToTrace } from "./normalize.ts";
+import { normalizeFileToTraces } from "./normalize.ts";
 import { isConcreteSource, type ConcreteSource } from "./source-adapters.ts";
 import type { CanonicalTrace, DiscoveredTrace, IngestError, IngestOptions } from "./types.ts";
 import { isRecord } from "./workspace.ts";
@@ -15,13 +15,13 @@ export async function runIngest(options: IngestOptions): Promise<void> {
     const inputPath = resolveManifestPath(options.manifest, entry.path);
     try {
       const source = coerceNormalizeSource(entry.normalize_source);
-      const result = await normalizeFileToTrace({
+      const result = await normalizeFileToTraces({
         source,
         input: inputPath,
         output: options.output,
         skipInvalidLines: options.skipInvalidLines,
       });
-      traces.push(result.trace);
+      traces.push(...result.traces);
     } catch (error) {
       const ingestError = {
         path: inputPath,

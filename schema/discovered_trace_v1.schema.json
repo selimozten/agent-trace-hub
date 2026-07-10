@@ -9,13 +9,13 @@
     "source": { "$ref": "#/$defs/source" },
     "normalize_source": { "$ref": "#/$defs/source" },
     "path": { "type": "string", "minLength": 1 },
-    "kind": { "enum": ["json", "jsonl", "markdown", "unknown"] },
+    "kind": { "enum": ["json", "jsonl", "sqlite", "markdown", "unknown"] },
     "confidence": { "enum": ["high", "medium", "low"] },
     "reason": { "type": "string" }
   },
   "$defs": {
     "source": {
-      "enum": ["pi", "claude-code", "codex", "cursor", "opencode", "continue", "goose", "openai-chat", "anthropic-messages", "markdown-transcript", "aider"]
+      "enum": ["pi", "omp", "claude-code", "codex", "cursor-agent", "cursor", "opencode", "continue", "goose", "openai-chat", "anthropic-messages", "generic-json", "markdown-transcript", "aider"]
     }
   }
 }
