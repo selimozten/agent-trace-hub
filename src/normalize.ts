@@ -13,21 +13,32 @@ import type {
   NormalizeSource,
 } from "./types.ts";
 import { validateCanonicalTrace } from "./canonical.ts";
-import { ADAPTERS } from "./source-adapters.ts";
+import { SourceAdapterRegistry, type SourceAdapter, type SourceAdapterImplementations } from "./source-adapters.ts";
 import { isRecord } from "./workspace.ts";
-
-export interface SourceAdapter {
-  source: Exclude<NormalizeSource, "auto">;
-  sourceFormat: string;
-  defaultAgent: string;
-  detect(records: JsonObject[]): boolean;
-  normalize(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace;
-}
 
 type BaseTraceOverrides = Partial<CanonicalTrace["source"]> & {
   session_id?: string;
   tools?: JsonObject[];
 };
+
+class JsonlRecordError extends Error {}
+
+const ADAPTER_IMPLEMENTATIONS: SourceAdapterImplementations = {
+  pi: { detect: detectPi, normalize: normalizePiSession },
+  "claude-code": { detect: detectClaudeCode, normalize: normalizeClaudeCodeSession },
+  codex: { detect: detectCodex, normalize: normalizeCodexSession },
+  cursor: { detect: detectCursor, normalize: normalizeCursorSession },
+  "anthropic-messages": { detect: detectAnthropicMessages, normalize: normalizeAnthropicMessagesSession },
+  opencode: { detect: neverAutoDetect, normalize: normalizeOpenAIChatSession },
+  continue: { detect: neverAutoDetect, normalize: normalizeOpenAIChatSession },
+  goose: { detect: neverAutoDetect, normalize: normalizeOpenAIChatSession },
+  "openai-chat": { detect: detectOpenAIChat, normalize: normalizeOpenAIChatSession },
+  "generic-json": { detect: detectGenericJsonChat, normalize: normalizeGenericJsonSession },
+  aider: { detect: detectAider, normalize: normalizeMarkdownTranscriptSession },
+  "markdown-transcript": { detect: detectMarkdownTranscript, normalize: normalizeMarkdownTranscriptSession },
+};
+
+const ADAPTER_REGISTRY = new SourceAdapterRegistry(ADAPTER_IMPLEMENTATIONS);
 
 export async function runNormalize(options: NormalizeOptions): Promise<void> {
   const { source, trace } = await normalizeFileToTrace(options);
@@ -44,13 +55,14 @@ export async function runNormalizeDir(options: NormalizeDirOptions): Promise<voi
   const traces: CanonicalTrace[] = [];
 
   for (const file of files) {
-    const records = await readJsonlObjects(file);
+    const records = await readInputRecords(file, options.skipInvalidLines);
     const { trace } = normalizeRecords(file, records, {
       source: options.source,
       input: file,
       output: options.output,
       agent: options.agent,
       model: options.model,
+      skipInvalidLines: options.skipInvalidLines,
     });
     traces.push(trace);
   }
@@ -63,13 +75,13 @@ export async function runNormalizeDir(options: NormalizeDirOptions): Promise<voi
 }
 
 export async function normalizeFileToTrace(options: NormalizeOptions): Promise<{ source: Exclude<NormalizeSource, "auto">; trace: CanonicalTrace }> {
-  const records = await readJsonlObjects(options.input);
+  const records = await readInputRecords(options.input, options.skipInvalidLines);
   const { adapter, trace } = normalizeRecords(options.input, records, options);
   return { source: adapter.source, trace };
 }
 
 function normalizeRecords(inputPath: string, records: JsonObject[], options: NormalizeOptions): { adapter: SourceAdapter; trace: CanonicalTrace } {
-  const adapter = resolveAdapter(options.source, records);
+  const adapter = ADAPTER_REGISTRY.resolve(options.source, records);
   const trace = adapter.normalize(inputPath, records, options);
   validateCanonicalTrace(trace);
   return { adapter, trace };
@@ -86,56 +98,104 @@ function findJsonlFiles(inputDir: string): string[] {
   return out.sort();
 }
 
-async function readJsonlObjects(inputPath: string): Promise<JsonObject[]> {
-  const text = fs.readFileSync(inputPath, "utf-8");
+async function readInputRecords(inputPath: string, skipInvalidLines = false): Promise<JsonObject[]> {
   if (!inputPath.endsWith(".jsonl")) {
-    const parsed = parseJsonDocument(text);
-    if (parsed) return parsed;
+    const text = fs.readFileSync(inputPath, "utf-8");
+    if (inputPath.endsWith(".json")) return parseJsonDocument(text, inputPath);
     return [{ _raw_text: text, _raw_format: path.extname(inputPath).slice(1) || "text" }];
   }
 
+  return readStableJsonlRecords(inputPath, skipInvalidLines);
+}
+
+async function readStableJsonlRecords(inputPath: string, skipInvalidLines: boolean): Promise<JsonObject[]> {
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    const before = fileVersion(inputPath);
+    let records: JsonObject[] | undefined;
+    let readError: unknown;
+    try {
+      records = await readJsonlRecordsOnce(inputPath, skipInvalidLines);
+    } catch (error) {
+      readError = error;
+    }
+
+    const changed = !sameFileVersion(before, fileVersion(inputPath));
+    if (changed && attempt < maxAttempts) {
+      await waitForWriter(attempt);
+      continue;
+    }
+    if (changed) throw new Error(`Input changed while reading ${inputPath}; retry after the writer is idle`);
+    if (readError instanceof JsonlRecordError && attempt < maxAttempts) {
+      await waitForWriter(attempt);
+      continue;
+    }
+    if (readError) throw readError;
+    return records as JsonObject[];
+  }
+  throw new Error(`Could not read stable input: ${inputPath}`);
+}
+
+async function readJsonlRecordsOnce(inputPath: string, skipInvalidLines: boolean): Promise<JsonObject[]> {
   const input = fs.createReadStream(inputPath, { encoding: "utf-8" });
   const reader = readline.createInterface({ input, crlfDelay: Infinity });
   const records: JsonObject[] = [];
+  let lineNumber = 0;
 
   for await (const line of reader) {
+    lineNumber += 1;
     if (line.trim() === "") continue;
     try {
       const parsed = JSON.parse(line) as unknown;
-      if (isRecord(parsed)) records.push(parsed as JsonObject);
-    } catch {
-      // Ignore malformed lines here. Redaction/review already records parse errors.
+      if (!isRecord(parsed)) throw new Error("expected a JSON object");
+      records.push(parsed as JsonObject);
+    } catch (error) {
+      if (skipInvalidLines) continue;
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new JsonlRecordError(`Invalid JSONL record at ${inputPath}:${lineNumber}: ${reason}`);
     }
   }
 
+  if (records.length === 0) throw new Error(`No JSON object records found in ${inputPath}`);
   return records;
+}
+
+function fileVersion(inputPath: string): { size: number; mtimeMs: number } {
+  const stats = fs.statSync(inputPath);
+  return { size: stats.size, mtimeMs: stats.mtimeMs };
+}
+
+function sameFileVersion(left: { size: number; mtimeMs: number }, right: { size: number; mtimeMs: number }): boolean {
+  return left.size === right.size && left.mtimeMs === right.mtimeMs;
+}
+
+function waitForWriter(attempt: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, attempt * 250));
 }
 
 function isSupportedInputFile(name: string): boolean {
   return [".jsonl", ".json", ".md", ".markdown", ".txt"].some((ext) => name.endsWith(ext));
 }
 
-function parseJsonDocument(text: string): JsonObject[] | undefined {
+function parseJsonDocument(text: string, inputPath: string): JsonObject[] {
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(text) as unknown;
-    if (Array.isArray(parsed)) return parsed.filter((item): item is JsonObject => isRecord(item));
-    if (isRecord(parsed)) return [parsed as JsonObject];
-  } catch {
-    return undefined;
+    parsed = JSON.parse(text) as unknown;
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid JSON document at ${inputPath}: ${reason}`);
   }
-  return undefined;
-}
-
-function resolveAdapter(source: NormalizeSource, records: JsonObject[]): SourceAdapter {
-  if (source !== "auto") {
-    const adapter = ADAPTERS.find((candidate) => candidate.source === source);
-    if (!adapter) throw new Error(`Unsupported source: ${source}`);
-    return adapter;
+  if (Array.isArray(parsed)) {
+    if (parsed.length === 0) throw new Error(`JSON document contains no records: ${inputPath}`);
+    const records: JsonObject[] = [];
+    for (const [index, item] of parsed.entries()) {
+      if (!isRecord(item)) throw new Error(`Invalid JSON record at ${inputPath}[${index}]: expected an object`);
+      records.push(item as JsonObject);
+    }
+    return records;
   }
-
-  const adapter = ADAPTERS.find((candidate) => candidate.detect(records));
-  if (!adapter) throw new Error("Could not auto-detect source. Pass --source explicitly.");
-  return adapter;
+  if (isRecord(parsed)) return [parsed as JsonObject];
+  throw new Error(`Invalid JSON document at ${inputPath}: expected an object or array of objects`);
 }
 
 function baseTrace(
@@ -177,7 +237,7 @@ export function neverAutoDetect(_records: JsonObject[]): boolean {
 }
 
 export function normalizePiSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
-  const adapter = ADAPTERS[0];
+  const adapter = ADAPTER_REGISTRY.require("pi");
   const messages: CanonicalMessage[] = [];
   let sessionId = path.basename(inputPath, ".jsonl");
   let cwd: string | undefined;
@@ -213,7 +273,7 @@ export function detectClaudeCode(records: JsonObject[]): boolean {
 }
 
 export function normalizeClaudeCodeSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
-  const adapter = ADAPTERS[1];
+  const adapter = ADAPTER_REGISTRY.require("claude-code");
   const messages: CanonicalMessage[] = [];
   let sessionId = path.basename(inputPath, ".jsonl");
   let cwd: string | undefined;
@@ -239,7 +299,7 @@ export function detectCodex(records: JsonObject[]): boolean {
 }
 
 export function normalizeCodexSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
-  const adapter = ADAPTERS[2];
+  const adapter = ADAPTER_REGISTRY.require("codex");
   const messages: CanonicalMessage[] = [];
   let pendingAssistant: CanonicalMessage | undefined;
   let sessionId = path.basename(inputPath, ".jsonl");
@@ -636,9 +696,7 @@ function hasAnthropicContent(record: JsonObject): boolean {
 }
 
 function adapterFor(source: Exclude<NormalizeSource, "auto">): SourceAdapter {
-  const adapter = ADAPTERS.find((candidate) => candidate.source === source);
-  if (!adapter) throw new Error(`Missing adapter: ${source}`);
-  return adapter;
+  return ADAPTER_REGISTRY.require(source);
 }
 
 function flushPendingAssistant(messages: CanonicalMessage[], pending: CanonicalMessage | undefined): void {

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { DiscoverOptions, DiscoveredTrace, NormalizeSource } from "./types.ts";
+import { isRecord } from "./workspace.ts";
 
 type ConcreteSource = Exclude<NormalizeSource, "auto">;
 
@@ -14,6 +15,7 @@ interface DiscoveryPattern {
   confidence: DiscoveredTrace["confidence"];
   reason: string;
   requirePathPart?: string;
+  exclude?: (file: string) => boolean;
   maxDepth?: number;
 }
 
@@ -35,6 +37,7 @@ const DISCOVERY_PATTERNS: DiscoveryPattern[] = [
     kind: "jsonl",
     confidence: "high",
     reason: "Claude Code project transcript JSONL directory",
+    exclude: isClaudeWorkflowTelemetry,
   },
   {
     source: "cursor",
@@ -176,7 +179,9 @@ function walk(current: string, pattern: DiscoveryPattern, depth: number, matches
     }
     if (!entry.isFile()) continue;
     if (!hasAllowedExtension(fullPath, pattern)) continue;
-    if (pattern.requirePathPart && !fullPath.split(path.sep).includes(pattern.requirePathPart)) continue;
+    const pathParts = fullPath.split(path.sep);
+    if (pattern.requirePathPart && !pathParts.includes(pattern.requirePathPart)) continue;
+    if (pattern.exclude?.(fullPath)) continue;
     matches.push(fullPath);
   }
 }
@@ -210,6 +215,34 @@ function isDirectory(dir: string): boolean {
     return fs.statSync(dir).isDirectory();
   } catch {
     return false;
+  }
+}
+
+function isClaudeWorkflowTelemetry(file: string): boolean {
+  const record = readFirstJsonlRecord(file);
+  if (!record || (record.type !== "started" && record.type !== "result")) return false;
+  return typeof record.agentId === "string"
+    && typeof record.key === "string"
+    && typeof record.sessionId !== "string"
+    && !isRecord(record.message);
+}
+
+function readFirstJsonlRecord(file: string): Record<string, unknown> | undefined {
+  const maxBytes = 64 * 1024;
+  let descriptor: number | undefined;
+  try {
+    descriptor = fs.openSync(file, "r");
+    const buffer = Buffer.allocUnsafe(maxBytes);
+    const bytesRead = fs.readSync(descriptor, buffer, 0, maxBytes, 0);
+    const text = buffer.toString("utf-8", 0, bytesRead);
+    const line = text.split(/\r?\n/).find((candidate) => candidate.trim() !== "");
+    if (!line) return undefined;
+    const parsed = JSON.parse(line) as unknown;
+    return isRecord(parsed) ? parsed : undefined;
+  } catch {
+    return undefined;
+  } finally {
+    if (descriptor !== undefined) fs.closeSync(descriptor);
   }
 }
 

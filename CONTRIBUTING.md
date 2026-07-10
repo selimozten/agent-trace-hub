@@ -12,12 +12,12 @@ npm run build
 ## Adding A Source Adapter
 
 1. Add the source name to `NormalizeSource` in `src/types.ts`.
-2. Add a `SourceAdapter` entry in `src/normalize.ts`.
-3. Keep detection conservative. Generic `openai-chat` and `anthropic-messages` should remain fallback adapters.
-4. Preserve structured reasoning, tool calls, and tool results.
-5. Add a safe fixture in `examples/`.
-6. Extend `scripts/verify-fixtures.mjs`.
-7. Update `README.md` and `ROADMAP.md`.
+2. Add its metadata to `SOURCE_ADAPTER_DEFINITIONS` in `src/source-adapters.ts`, including an honest `native`, `compatibility`, or `fallback` support label.
+3. Add its detector and normalizer to `ADAPTER_IMPLEMENTATIONS` in `src/normalize.ts`. The registry rejects missing, duplicate, or unknown entries at startup.
+4. Keep detection conservative. Compatibility adapters cannot auto-detect, and generic `openai-chat`, `anthropic-messages`, and `generic-json` should remain fallback adapters.
+5. Preserve structured reasoning, tool calls, tool results, tool schemas, source metadata, and ordering.
+6. Add a safe fixture in `examples/` and extend `scripts/verify-fixtures.mjs`. Every registry entry must have a fixture.
+7. Run `agent-trace-hub sources --json` and update `README.md` and `ROADMAP.md`.
 
 ## Adding A Renderer
 

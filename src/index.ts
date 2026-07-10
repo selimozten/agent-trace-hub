@@ -1,6 +1,6 @@
 #!/usr/bin/env node --experimental-strip-types --no-warnings=ExperimentalWarning
 
-import { parseApproveArgs, parseAuditArgs, parseCollectArgs, parseDiscoverArgs, parseEnrichArgs, parseGrepArgs, parseIngestArgs, parseInitArgs, parseListArgs, parseNormalizeArgs, parseNormalizeDirArgs, parseRejectArgs, parseReleaseArgs, parseRenderArgs, parseReviewArgs, parseReviewGateArgs, parseUploadArgs, parseValidateArtifactArgs, parseValidateArgs, printUsage } from "./cli.ts";
+import { parseApproveArgs, parseAuditArgs, parseCollectArgs, parseDiscoverArgs, parseEnrichArgs, parseGrepArgs, parseIngestArgs, parseInitArgs, parseListArgs, parseNormalizeArgs, parseNormalizeDirArgs, parseRejectArgs, parseReleaseArgs, parseRenderArgs, parseReviewArgs, parseReviewGateArgs, parseSourcesArgs, parseUploadArgs, parseValidateArtifactArgs, parseValidateArgs, printUsage } from "./cli.ts";
 import { runApprove } from "./approve.ts";
 import { runAudit } from "./audit.ts";
 import { runCollect, runInit } from "./collect.ts";
@@ -14,6 +14,7 @@ import { runReviewGate } from "./review-gate.ts";
 import { ensureStartupTools } from "./process.ts";
 import { runReject } from "./reject.ts";
 import { runReview } from "./review.ts";
+import { runSources } from "./sources.ts";
 import { runUpload } from "./upload.ts";
 import { runGrep, runList } from "./query.ts";
 import { runValidateArtifact } from "./validate-artifact.ts";
@@ -62,6 +63,11 @@ async function main(): Promise<void> {
 
   if (command === "grep") {
     await runGrep(parseGrepArgs(args.slice(1)));
+    return;
+  }
+
+  if (command === "sources") {
+    runSources(parseSourcesArgs(args.slice(1)));
     return;
   }
 

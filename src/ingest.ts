@@ -2,25 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import readline from "node:readline";
 import { normalizeFileToTrace } from "./normalize.ts";
-import type { CanonicalTrace, DiscoveredTrace, IngestError, IngestOptions, NormalizeSource } from "./types.ts";
+import { isConcreteSource, type ConcreteSource } from "./source-adapters.ts";
+import type { CanonicalTrace, DiscoveredTrace, IngestError, IngestOptions } from "./types.ts";
 import { isRecord } from "./workspace.ts";
-
-type ConcreteSource = Exclude<NormalizeSource, "auto">;
-
-const NORMALIZE_SOURCES = new Set<ConcreteSource>([
-  "pi",
-  "claude-code",
-  "codex",
-  "cursor",
-  "opencode",
-  "continue",
-  "goose",
-  "openai-chat",
-  "anthropic-messages",
-  "generic-json",
-  "markdown-transcript",
-  "aider",
-]);
 
 export async function runIngest(options: IngestOptions): Promise<void> {
   const entries = await readDiscoveryManifest(options.manifest);
@@ -35,6 +19,7 @@ export async function runIngest(options: IngestOptions): Promise<void> {
         source,
         input: inputPath,
         output: options.output,
+        skipInvalidLines: options.skipInvalidLines,
       });
       traces.push(result.trace);
     } catch (error) {
@@ -86,8 +71,8 @@ async function readDiscoveryManifest(manifestPath: string): Promise<DiscoveredTr
 }
 
 function coerceNormalizeSource(source: string): ConcreteSource {
-  if (!NORMALIZE_SOURCES.has(source as ConcreteSource)) throw new Error(`Unsupported normalize_source: ${source}`);
-  return source as ConcreteSource;
+  if (!isConcreteSource(source)) throw new Error(`Unsupported normalize_source: ${source}`);
+  return source;
 }
 
 function resolveManifestPath(manifestPath: string, entryPath: string): string {

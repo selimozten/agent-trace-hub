@@ -1,6 +1,7 @@
 import os from "node:os";
 import path from "node:path";
-import type { ApproveOptions, ArtifactKind, AuditOptions, CollectOptions, DiscoverOptions, EnrichOptions, GrepOptions, IngestOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, ReleaseOptions, RenderOptions, ReviewGateOptions, ReviewOptions, UploadOptions, ValidateArtifactOptions, ValidateOptions } from "./types.ts";
+import { isNormalizeSource, normalizeSourceList } from "./source-adapters.ts";
+import type { ApproveOptions, ArtifactKind, AuditOptions, CollectOptions, DiscoverOptions, EnrichOptions, GrepOptions, IngestOptions, InitOptions, ListOptions, NormalizeDirOptions, NormalizeOptions, RejectOptions, ReleaseOptions, RenderOptions, ReviewGateOptions, ReviewOptions, SourcesOptions, UploadOptions, ValidateArtifactOptions, ValidateOptions } from "./types.ts";
 import { loadDenyPatterns } from "./review.ts";
 
 export function printUsage(): void {
@@ -15,6 +16,7 @@ Usage:
   agent-trace-hub reject [--workspace <dir>] <image-or-session>
   agent-trace-hub list [--workspace <dir>] --uploadable
   agent-trace-hub grep [--workspace <dir>] [--ignore-case] <pattern>
+  agent-trace-hub sources [--json]
   agent-trace-hub discover [--root <dir>] [--source <source>|all] [--output <file.jsonl>]
   agent-trace-hub ingest --manifest <file.jsonl> --output <file.jsonl> [options]
   agent-trace-hub normalize --source <source> --input <file.jsonl> --output <file.jsonl> [options]
@@ -36,6 +38,7 @@ Commands:
   reject    Add a session to workspace/reject.txt so upload always skips it
   list      List sessions matching built-in filters
   grep      Ripgrep only the uploadable session set
+  sources   List built-in source adapters and their support level
   discover  Find local candidate trace files from supported coding-agent harnesses
   ingest    Normalize a mixed-source discovery manifest into one canonical shard
   normalize Convert a supported raw/redacted agent trace into agent_trace_v1
@@ -96,6 +99,9 @@ Grep options:
   --ignore-case, -i      Case-insensitive search
   <pattern>              Ripgrep pattern to run against uploadable sessions
 
+Sources options:
+  --json                  Emit the adapter registry as JSON
+
 Discover options:
   --root <dir>            Home/root directory to scan (default: ~)
   --source <source>|all   Limit discovery to one source (default: all)
@@ -106,6 +112,7 @@ Ingest options:
   --output <file.jsonl>   Output canonical agent_trace_v1 JSONL
   --error-output <file>   Write JSONL ingest errors
   --continue-on-error     Keep ingesting remaining manifest entries after failures
+  --skip-invalid-lines    Partially recover files containing malformed JSONL rows
 
 Normalize options:
   --source <source>       Input source format: auto, pi, claude-code, codex, cursor, opencode, continue, goose, openai-chat, anthropic-messages, generic-json, markdown-transcript, aider
@@ -114,6 +121,7 @@ Normalize options:
   --input-dir <dir>       Source directory for normalize-dir
   --agent <name>          Source agent label (default: pi)
   --model <id>            Source model id if known
+  --skip-invalid-lines    Skip malformed/non-object JSONL rows instead of failing
 
 Validate options:
   --input <file>          Canonical agent_trace_v1 JSONL
@@ -360,11 +368,21 @@ export function parseDiscoverArgs(args: string[]): DiscoverOptions {
   return { root, source, output };
 }
 
+export function parseSourcesArgs(args: string[]): SourcesOptions {
+  let json = false;
+  for (const arg of args) {
+    if (arg === "--json") json = true;
+    else throw new Error(`Unknown sources option: ${arg}`);
+  }
+  return { json };
+}
+
 export function parseIngestArgs(args: string[]): IngestOptions {
   let manifest = "";
   let output = "";
   let errorOutput: string | undefined;
   let continueOnError = false;
+  let skipInvalidLines = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -372,12 +390,13 @@ export function parseIngestArgs(args: string[]): IngestOptions {
     else if (arg === "--output") output = path.resolve(requireValue(args, ++i, "--output"));
     else if (arg === "--error-output") errorOutput = path.resolve(requireValue(args, ++i, "--error-output"));
     else if (arg === "--continue-on-error") continueOnError = true;
+    else if (arg === "--skip-invalid-lines") skipInvalidLines = true;
     else throw new Error(`Unknown ingest option: ${arg}`);
   }
 
   if (!manifest) throw new Error("ingest requires --manifest");
   if (!output) throw new Error("ingest requires --output");
-  return { manifest, output, errorOutput, continueOnError };
+  return { manifest, output, errorOutput, continueOnError, skipInvalidLines };
 }
 
 export function parseNormalizeArgs(args: string[]): NormalizeOptions {
@@ -386,6 +405,7 @@ export function parseNormalizeArgs(args: string[]): NormalizeOptions {
   let output = "";
   let agent: string | undefined;
   let model: string | undefined;
+  let skipInvalidLines = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -394,6 +414,7 @@ export function parseNormalizeArgs(args: string[]): NormalizeOptions {
     else if (arg === "--output") output = path.resolve(requireValue(args, ++i, "--output"));
     else if (arg === "--agent") agent = requireValue(args, ++i, "--agent");
     else if (arg === "--model") model = requireValue(args, ++i, "--model");
+    else if (arg === "--skip-invalid-lines") skipInvalidLines = true;
     else throw new Error(`Unknown normalize option: ${arg}`);
   }
 
@@ -402,7 +423,7 @@ export function parseNormalizeArgs(args: string[]): NormalizeOptions {
   }
   if (!input) throw new Error("normalize requires --input");
   if (!output) throw new Error("normalize requires --output");
-  return { source: source as NormalizeOptions["source"], input, output, agent, model };
+  return { source: source as NormalizeOptions["source"], input, output, agent, model, skipInvalidLines };
 }
 
 export function parseNormalizeDirArgs(args: string[]): NormalizeDirOptions {
@@ -411,6 +432,7 @@ export function parseNormalizeDirArgs(args: string[]): NormalizeDirOptions {
   let output = "";
   let agent: string | undefined;
   let model: string | undefined;
+  let skipInvalidLines = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
@@ -419,6 +441,7 @@ export function parseNormalizeDirArgs(args: string[]): NormalizeDirOptions {
     else if (arg === "--output") output = path.resolve(requireValue(args, ++i, "--output"));
     else if (arg === "--agent") agent = requireValue(args, ++i, "--agent");
     else if (arg === "--model") model = requireValue(args, ++i, "--model");
+    else if (arg === "--skip-invalid-lines") skipInvalidLines = true;
     else throw new Error(`Unknown normalize-dir option: ${arg}`);
   }
 
@@ -427,7 +450,7 @@ export function parseNormalizeDirArgs(args: string[]): NormalizeDirOptions {
   }
   if (!inputDir) throw new Error("normalize-dir requires --input-dir");
   if (!output) throw new Error("normalize-dir requires --output");
-  return { source: source as NormalizeDirOptions["source"], inputDir, output, agent, model };
+  return { source: source as NormalizeDirOptions["source"], inputDir, output, agent, model, skipInvalidLines };
 }
 
 export function parseValidateArgs(args: string[]): ValidateOptions {
@@ -611,16 +634,8 @@ export function parseReleaseArgs(args: string[]): ReleaseOptions {
   return { inputs, outputDir, auditReport, approvalReport, reviewGate, name, license, force };
 }
 
-function isNormalizeSource(source: string): boolean {
-  return ["auto", "pi", "claude-code", "codex", "cursor", "opencode", "continue", "goose", "openai-chat", "anthropic-messages", "generic-json", "markdown-transcript", "aider"].includes(source);
-}
-
 function isAuditProfile(value: string): value is AuditOptions["profile"] {
   return value === "local" || value === "private" || value === "public";
-}
-
-function normalizeSourceList(): string {
-  return "auto, pi, claude-code, codex, cursor, opencode, continue, goose, openai-chat, anthropic-messages, generic-json, markdown-transcript, aider";
 }
 
 function isArtifactKind(kind: string): kind is ArtifactKind {

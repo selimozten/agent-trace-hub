@@ -99,6 +99,10 @@ export interface DiscoverOptions {
   source?: NormalizeSource | "all";
 }
 
+export interface SourcesOptions {
+  json: boolean;
+}
+
 export interface DiscoveredTrace {
   source: Exclude<NormalizeSource, "auto">;
   normalize_source: Exclude<NormalizeSource, "auto">;
@@ -129,6 +133,7 @@ export interface NormalizeOptions {
   output: string;
   agent?: string;
   model?: string;
+  skipInvalidLines?: boolean;
 }
 
 export interface NormalizeDirOptions {
@@ -137,6 +142,7 @@ export interface NormalizeDirOptions {
   output: string;
   agent?: string;
   model?: string;
+  skipInvalidLines?: boolean;
 }
 
 export interface IngestOptions {
@@ -144,6 +150,7 @@ export interface IngestOptions {
   output: string;
   errorOutput?: string;
   continueOnError: boolean;
+  skipInvalidLines: boolean;
 }
 
 export interface IngestError {

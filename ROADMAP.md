@@ -41,6 +41,8 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 | Component | Status | Notes |
 | --- | --- | --- |
 | Source adapter registry | yes | Adapter metadata and registration live in `src/source-adapters.ts` so new harness parsers can be added without changing normalize command flow. |
+| Registry introspection | yes | `sources` exposes support level, detection policy, source format, and default agent from the executable registry. |
+| Strict input parsing | yes | Active writers are retried briefly; persistent malformed JSON/JSONL fails with source location, and partial recovery is explicit. |
 | Per-source implementation files | partial | Parser implementations still share `src/normalize.ts`; split into per-source modules as native OpenCode/Continue/Goose samples become available. |
 
 ## Next Source Adapters
@@ -74,5 +76,7 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 ## Production Hardening
 
 - Add native OpenCode, Continue, and Goose parsers once real local-session samples are available.
+- Split native parser implementations into source-local modules behind the registry seam.
+- Validate discovery candidates against adapter detection before assigning high confidence.
 - Add preference-pair renderers when quality labels or rejected alternatives are available.
 - Before any external publication, choose explicit project and dataset licenses and run a redistribution review.

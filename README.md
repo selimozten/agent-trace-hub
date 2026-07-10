@@ -27,6 +27,7 @@ Implemented:
 - `generic-json` fallback adapter for nested role/content exports such as `history`, `conversation`, `events`, or `transcript`
 - preservation of source tool schemas when API-shaped exports include them
 - `normalize --source auto` source detection
+- `sources` for machine-readable adapter support and auto-detection metadata
 - `discover` for finding local candidate traces from common coding-agent harnesses
 - `ingest` for normalizing mixed-source discovery manifests into one canonical shard
 - `normalize-dir` for combining a directory of trace JSONL files into one canonical JSONL shard
@@ -51,6 +52,8 @@ Planned:
 Normalize a trace:
 
 ```bash
+agent-trace-hub sources
+
 agent-trace-hub discover \
   --root "$HOME" \
   --output raw/discovered-traces.jsonl
@@ -89,7 +92,11 @@ Supported source values:
 
 `opencode`, `continue`, and `goose` currently expect OpenAI-compatible exported JSONL: either one line with a `messages` array or one message per JSONL line. Native private session-store parsers should be added against real samples when those formats differ.
 
+Run `agent-trace-hub sources --json` to inspect the executable adapter registry. Each source is labeled `native`, `compatibility`, or `fallback`, and reports whether auto-detection is enabled.
+
 `generic-json` is a conservative fallback for JSON/JSONL exports that are not provider-shaped but still contain role/content messages. It recognizes common nested arrays such as `messages`, `conversation`, `history`, `turns`, `events`, `transcript`, and `items`, plus role aliases like `human`, `ai`, `model`, and `tool_result`.
+
+JSON and JSONL parsing is strict by default so corrupt rows cannot disappear silently. Active JSONL files are retried briefly when a writer is finishing a line, and persistent failures report the file and line number. `normalize`, `normalize-dir`, and `ingest` accept `--skip-invalid-lines` when partial recovery is intentional; the command still fails if no valid object records remain.
 
 `discover` emits a JSONL manifest of candidate trace files with `source`, `normalize_source`, `path`, `kind`, `confidence`, and `reason`. It scans known harness locations under `--root`, including Codex, Claude Code, Cursor, OpenCode, Continue, Goose, Pi, and project-local Aider history files.
 
@@ -259,6 +266,8 @@ npm run build
 `npm test` regenerates the examples and verifies:
 
 - Pi, Claude Code, Codex, Cursor, Aider, Markdown transcript, OpenAI-chat, and Anthropic-message normalization
+- adapter registry coverage, support labels, and compatibility auto-detection invariants
+- active-writer retry, strict malformed JSON/JSONL rejection, and explicit partial JSONL recovery
 - local trace discovery for supported harness directories
 - mixed-source manifest ingest and error reporting
 - canonical schema validation

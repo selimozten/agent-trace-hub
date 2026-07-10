@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -25,6 +25,17 @@ for (const [source, input, output] of fixtures) {
   run([...nodeArgs, "validate", "--input", output]);
 }
 
+const sourceRegistry = JSON.parse(execFileSync(process.execPath, [...nodeArgs, "sources", "--json"], { cwd: root, encoding: "utf-8" }));
+assert(sourceRegistry.length === fixtures.length, "source registry and normalization fixtures should stay in sync");
+for (const [source] of fixtures) {
+  assert(sourceRegistry.some((entry) => entry.source === source), `source registry missing ${source}`);
+}
+for (const source of ["opencode", "continue", "goose"]) {
+  const entry = sourceRegistry.find((candidate) => candidate.source === source);
+  assert(entry.support === "compatibility", `${source} should be labeled as compatibility support`);
+  assert(entry.autoDetect === false, `${source} compatibility adapter must require an explicit source`);
+}
+
 run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/codex-session.jsonl", "--output", "examples/codex-session.auto.agent_trace_v1.jsonl"]);
 run([...nodeArgs, "validate", "--input", "examples/codex-session.auto.agent_trace_v1.jsonl"]);
 run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/anthropic-messages-session.jsonl", "--output", "examples/anthropic-messages-session.auto.agent_trace_v1.jsonl"]);
@@ -35,6 +46,51 @@ run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/generic-
 run([...nodeArgs, "validate", "--input", "examples/generic-json-session.auto.agent_trace_v1.jsonl"]);
 run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/aider-history.md", "--output", "examples/aider-history.auto.agent_trace_v1.jsonl"]);
 run([...nodeArgs, "validate", "--input", "examples/aider-history.auto.agent_trace_v1.jsonl"]);
+
+const malformedJsonl = path.join(root, "examples/.tmp-malformed-codex.jsonl");
+const recoveredJsonl = path.join(root, "examples/.tmp-recovered-codex.agent_trace_v1.jsonl");
+fs.writeFileSync(malformedJsonl, `not-json\n${fs.readFileSync(path.join(root, "examples/codex-session.jsonl"), "utf-8")}`);
+assertCommandFailsWith(
+  [...nodeArgs, "normalize", "--source", "auto", "--input", malformedJsonl, "--output", recoveredJsonl],
+  /Invalid JSONL record at .*\.tmp-malformed-codex\.jsonl:1:/,
+  "normalize should identify malformed JSONL by file and line",
+);
+run([...nodeArgs, "normalize", "--source", "auto", "--input", malformedJsonl, "--output", recoveredJsonl, "--skip-invalid-lines"]);
+run([...nodeArgs, "validate", "--input", recoveredJsonl]);
+assert(readJsonl(recoveredJsonl).length === 1, "partial JSONL recovery should retain the valid trace");
+
+const activeJsonl = path.join(root, "examples/.tmp-active-codex.jsonl");
+const activeOutput = path.join(root, "examples/.tmp-active-codex.agent_trace_v1.jsonl");
+fs.writeFileSync(activeJsonl, `${fs.readFileSync(path.join(root, "examples/codex-session.jsonl"), "utf-8")}{"timestamp":"2026-06-29T12:00:03Z","type":"event_msg","payload":{"type":"token_count"`);
+spawn(process.execPath, [
+  "-e",
+  "const fs = require('node:fs'); setTimeout(() => fs.appendFileSync(process.argv[1], '}}\\n'), 20);",
+  activeJsonl,
+], { cwd: root, stdio: "ignore" });
+run([...nodeArgs, "normalize", "--source", "codex", "--input", activeJsonl, "--output", activeOutput]);
+run([...nodeArgs, "validate", "--input", activeOutput]);
+assert(readJsonl(activeOutput).length === 1, "normalize should retry a JSONL file that is completed during an active write");
+
+const malformedJson = path.join(root, "examples/.tmp-malformed.json");
+fs.writeFileSync(malformedJson, "{not-json");
+assertCommandFailsWith(
+  [...nodeArgs, "normalize", "--source", "generic-json", "--input", malformedJson, "--output", recoveredJsonl],
+  /Invalid JSON document at .*\.tmp-malformed\.json:/,
+  "normalize should reject malformed JSON documents instead of treating them as text",
+);
+
+const recoveryManifest = path.join(root, "examples/.tmp-recovery-manifest.jsonl");
+const recoveryIngestOutput = path.join(root, "examples/.tmp-recovery-ingest.agent_trace_v1.jsonl");
+fs.writeFileSync(recoveryManifest, `${JSON.stringify({
+  source: "codex",
+  normalize_source: "codex",
+  path: malformedJsonl,
+  kind: "jsonl",
+  confidence: "high",
+  reason: "fixture",
+})}\n`);
+run([...nodeArgs, "ingest", "--manifest", recoveryManifest, "--output", recoveryIngestOutput, "--skip-invalid-lines"]);
+assert(readJsonl(recoveryIngestOutput).length === 1, "ingest should pass partial-recovery policy to normalization");
 
 const tmpRawDir = path.join(root, "examples/.tmp-raw");
 fs.rmSync(tmpRawDir, { recursive: true, force: true });
@@ -61,6 +117,7 @@ const discoverOutput = path.join(root, "examples/discovered-traces.jsonl");
 fs.rmSync(discoverRoot, { recursive: true, force: true });
 fs.mkdirSync(path.join(discoverRoot, ".codex/sessions/2026/06/29"), { recursive: true });
 fs.mkdirSync(path.join(discoverRoot, ".claude/projects/example"), { recursive: true });
+fs.mkdirSync(path.join(discoverRoot, ".claude/projects/example/subagents/workflows/wf_fixture"), { recursive: true });
 fs.mkdirSync(path.join(discoverRoot, ".cursor/projects/example/agent-transcripts/session"), { recursive: true });
 fs.mkdirSync(path.join(discoverRoot, ".local/share/opencode/sessions"), { recursive: true });
 fs.mkdirSync(path.join(discoverRoot, ".continue/sessions"), { recursive: true });
@@ -78,10 +135,12 @@ for (const file of [
   fs.writeFileSync(path.join(discoverRoot, file), "{}\n");
 }
 fs.writeFileSync(path.join(discoverRoot, ".aider.chat.history.md"), "#### user\n\nhello\n");
+fs.writeFileSync(path.join(discoverRoot, ".claude/projects/example/subagents/workflows/wf_fixture/events.jsonl"), `${JSON.stringify({ type: "started", agentId: "fixture", key: "fixture-key" })}\n`);
 run([...nodeArgs, "discover", "--root", discoverRoot, "--output", discoverOutput]);
 run([...nodeArgs, "validate-artifact", "--kind", "discovery", "--input", discoverOutput]);
 assertInvalidArtifact("discovery", [{ source: "codex", path: "missing-normalize-source.jsonl", kind: "jsonl", confidence: "high", reason: "fixture" }]);
 const discovered = readJsonl(discoverOutput);
+assert(discovered.length === 8, "discover should exclude Claude workflow telemetry JSONL");
 for (const source of ["aider", "claude-code", "codex", "continue", "cursor", "goose", "opencode", "pi"]) {
   assert(discovered.some((entry) => entry.source === source && entry.normalize_source === source), `discover missing ${source}`);
 }
@@ -279,6 +338,13 @@ fs.rmSync(path.join(root, "examples/anthropic-messages-session.auto.agent_trace_
 fs.rmSync(path.join(root, "examples/cursor-session.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(path.join(root, "examples/generic-json-session.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(path.join(root, "examples/aider-history.auto.agent_trace_v1.jsonl"), { force: true });
+fs.rmSync(malformedJsonl, { force: true });
+fs.rmSync(malformedJson, { force: true });
+fs.rmSync(recoveredJsonl, { force: true });
+fs.rmSync(activeJsonl, { force: true });
+fs.rmSync(activeOutput, { force: true });
+fs.rmSync(recoveryManifest, { force: true });
+fs.rmSync(recoveryIngestOutput, { force: true });
 fs.rmSync(ingestManifest, { force: true });
 fs.rmSync(ingestOutput, { force: true });
 fs.rmSync(ingestErrorManifest, { force: true });
@@ -316,6 +382,20 @@ function assertCommandFails(args, message) {
     execFileSync(process.execPath, args, { cwd: root, stdio: "pipe" });
   } catch {
     return;
+  }
+  throw new Error(message);
+}
+
+function assertCommandFailsWith(args, pattern, message) {
+  try {
+    execFileSync(process.execPath, args, { cwd: root, stdio: "pipe" });
+  } catch (error) {
+    const output = [error.stdout, error.stderr]
+      .filter(Boolean)
+      .map((value) => Buffer.isBuffer(value) ? value.toString("utf-8") : String(value))
+      .join("\n");
+    if (pattern.test(output)) return;
+    throw new Error(`${message}: unexpected error output: ${output}`);
   }
   throw new Error(message);
 }
