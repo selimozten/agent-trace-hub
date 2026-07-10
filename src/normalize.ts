@@ -89,7 +89,7 @@ export async function normalizeFileToTraces(options: NormalizeOptions): Promise<
     if (options.source !== "auto" && options.source !== "opencode") {
       throw new Error(`OpenCode database input requires --source auto or opencode, received ${options.source}`);
     }
-    const traces = readOpenCodeDatabase(options.input)
+    const traces = (await readOpenCodeDatabase(options.input))
       .filter((records) => Array.isArray(records[0]?.messages) && records[0].messages.length > 0)
       .map((records) => normalizeRecords(options.input, records, { ...options, source: "opencode" }, false).trace)
       .filter((trace) => trace.messages.length > 0);

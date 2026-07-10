@@ -1,13 +1,21 @@
-import { DatabaseSync } from "node:sqlite";
 import type { JsonObject, JsonValue } from "./types.ts";
 import { isRecord } from "./workspace.ts";
 
 type SqlRow = Record<string, unknown>;
+interface SqlStatement {
+  all(...params: unknown[]): SqlRow[];
+}
+interface SqlDatabase {
+  prepare(sql: string): SqlStatement;
+  exec(sql: string): void;
+  close(): void;
+}
+type SqlDatabaseConstructor = new (path: string, options: Record<string, boolean>) => SqlDatabase;
 
 const REQUIRED_TABLES = ["session", "message", "part"] as const;
 
-export function readOpenCodeDatabase(inputPath: string): JsonObject[][] {
-  const database = new DatabaseSync(inputPath, { readOnly: true });
+export async function readOpenCodeDatabase(inputPath: string): Promise<JsonObject[][]> {
+  const database = await openReadOnlyDatabase(inputPath);
   try {
     assertOpenCodeSchema(database);
     database.exec("BEGIN");
@@ -50,7 +58,16 @@ export function readOpenCodeDatabase(inputPath: string): JsonObject[][] {
   }
 }
 
-function assertOpenCodeSchema(database: DatabaseSync): void {
+async function openReadOnlyDatabase(inputPath: string): Promise<SqlDatabase> {
+  const isBun = typeof process.versions.bun === "string";
+  const specifier = isBun ? "bun:sqlite" : "node:sqlite";
+  const sqlite = await import(specifier) as Record<string, unknown>;
+  const Constructor = (isBun ? sqlite.Database : sqlite.DatabaseSync) as SqlDatabaseConstructor | undefined;
+  if (!Constructor) throw new Error(`SQLite driver is unavailable in ${isBun ? "Bun" : "Node.js"}`);
+  return new Constructor(inputPath, isBun ? { readonly: true, strict: true } : { readOnly: true });
+}
+
+function assertOpenCodeSchema(database: SqlDatabase): void {
   const rows = database.prepare(`
     SELECT name FROM sqlite_master
     WHERE type = 'table' AND name IN ('session', 'message', 'part')

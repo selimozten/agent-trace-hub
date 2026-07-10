@@ -7,7 +7,11 @@ npm ci
 npm run check
 npm test
 npm run build
+npm run build:binary
+npm run test:binary
 ```
+
+Use `npm run build:binaries` only when preparing cross-platform release artifacts; it downloads the target Bun runtimes and produces substantially larger build output.
 
 ## Adding A Source Adapter
 

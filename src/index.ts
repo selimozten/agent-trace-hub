@@ -19,10 +19,16 @@ import { runUpload } from "./upload.ts";
 import { runGrep, runList } from "./query.ts";
 import { runValidateArtifact } from "./validate-artifact.ts";
 import { runValidate } from "./validate.ts";
+import { VERSION } from "./version.ts";
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const command = args[0];
+
+  if (command === "--version" || command === "-v" || command === "version") {
+    console.log(VERSION);
+    return;
+  }
 
   if (!command || command === "--help" || command === "-h" || args.includes("--help") || args.includes("-h")) {
     printUsage();

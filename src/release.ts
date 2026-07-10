@@ -4,6 +4,7 @@ import path from "node:path";
 import { loadApprovalReport, loadPassingAuditReport } from "./approve.ts";
 import { readCanonicalJsonl } from "./canonical.ts";
 import { loadApprovedReviewGate } from "./review-gate.ts";
+import { EMBEDDED_SCHEMAS } from "./schema-assets.ts";
 import type { CanonicalTrace, ReleaseDatasetInfo, ReleaseManifestEntry, ReleaseOptions } from "./types.ts";
 
 const DEFAULT_DATASET_NAME = "agent-trace-hub canonical traces";
@@ -157,14 +158,10 @@ function sha256Text(text: string): string {
 }
 
 function copySchemas(outputDir: string): void {
-  const sourceDir = path.resolve("schema");
-  if (!fs.existsSync(sourceDir)) return;
   const targetDir = path.join(outputDir, "schema");
   fs.mkdirSync(targetDir, { recursive: true });
-  for (const entry of fs.readdirSync(sourceDir, { withFileTypes: true })) {
-    if (entry.isFile() && entry.name.endsWith(".schema.json")) {
-      fs.copyFileSync(path.join(sourceDir, entry.name), path.join(targetDir, entry.name));
-    }
+  for (const [name, schema] of Object.entries(EMBEDDED_SCHEMAS)) {
+    fs.writeFileSync(path.join(targetDir, name), `${JSON.stringify(schema, null, 2)}\n`);
   }
 }
 

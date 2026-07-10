@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { embeddedSchema } from "./schema-assets.ts";
 import type { JsonValue } from "./types.ts";
 import { isRecord } from "./workspace.ts";
 
@@ -119,7 +120,8 @@ function resolveRef(ref: string, rootSchema: SchemaObject, schemaDir: string): S
 }
 
 function readSchema(schemaPath: string): SchemaObject {
-  const parsed = JSON.parse(fs.readFileSync(schemaPath, "utf-8")) as unknown;
+  const bundled = embeddedSchema(path.basename(schemaPath));
+  const parsed = bundled ?? JSON.parse(fs.readFileSync(schemaPath, "utf-8")) as unknown;
   if (!isRecord(parsed)) throw new Error(`Invalid schema: ${schemaPath}`);
   return parsed as SchemaObject;
 }

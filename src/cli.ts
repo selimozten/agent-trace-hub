@@ -9,6 +9,7 @@ export function printUsage(): void {
 agent-trace-hub
 
 Usage:
+  agent-trace-hub --version
   agent-trace-hub init --cwd <dir> --repo <hf-dataset-repo> --workspace <dir> [options]
   agent-trace-hub collect [--workspace <dir>] [options] [context-file...]
   agent-trace-hub review [--workspace <dir>] [options] [context-file...]

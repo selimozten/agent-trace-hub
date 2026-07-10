@@ -54,6 +54,40 @@ Planned:
 - direct extraction from the Goose local store
 - additional training-target renderers such as TRL preference pairs and DPO/ORPO pairs
 
+## Installation
+
+Build and install a standalone executable from this checkout:
+
+```bash
+npm ci
+bun run install:local
+ath --version
+```
+
+This installs `ath` and the `agent-trace-hub` alias into `~/.local/bin`. Override the destination when needed:
+
+```bash
+ATH_INSTALL_DIR=/usr/local/bin bun run install:local
+```
+
+Bun is required only to build the executable. The installed 63 MiB binary contains the Bun runtime, application dependencies, SQLite driver, and JSON schemas; it does not require Bun, Node.js, or `node_modules` at runtime.
+
+Build without installing:
+
+```bash
+npm run build:binary
+./dist-bin/ath --version
+npm run test:binary
+```
+
+Tagged GitHub releases build archives for macOS ARM64/x64, Linux ARM64/x64, and Windows x64. Maintainers can build the same matrix locally with `npm run build:binaries` or one target with:
+
+```bash
+bun scripts/build-binary.mjs --target bun-linux-x64-baseline
+```
+
+The `collect` and `review` workflows can still require external tools such as Pi and TruffleHog. Trace discovery, normalization, validation, rendering, auditing, and release packaging are self-contained.
+
 ## Usage
 
 Normalize a trace:

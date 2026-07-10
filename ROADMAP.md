@@ -18,6 +18,7 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 | Render training targets | yes | Renders multiple model-family formats from canonical data. |
 | Enrich outcomes | yes | `enrich` derives command, test, build, final-diff availability, and user-acceptance signals from canonical traces. |
 | Review/redact before release | partial | Strong inherited Pi workflow plus deterministic canonical audit, human approval, and dataset-level review gate; running external LLM review remains an integration concern. |
+| Standalone distribution | yes | Bun produces a dependency-free executable; CI verifies it and tagged releases build five platform targets. |
 
 ## Current Support
 
