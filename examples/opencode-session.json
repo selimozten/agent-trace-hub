@@ -1,0 +1,115 @@
+{
+  "info": {
+    "id": "example-opencode-session",
+    "slug": "example-opencode",
+    "projectID": "example-project",
+    "directory": "/redacted/opencode-project",
+    "title": "Fix the lint failure",
+    "version": "1.2.3",
+    "time": {
+      "created": 1782720000000,
+      "updated": 1782720060000
+    }
+  },
+  "messages": [
+    {
+      "info": {
+        "id": "msg_opencode_user",
+        "sessionID": "example-opencode-session",
+        "role": "user",
+        "agent": "build",
+        "model": {
+          "providerID": "openai",
+          "modelID": "qwen-coder-example"
+        },
+        "system": "Work carefully and verify the patch.",
+        "time": {
+          "created": 1782720000000
+        }
+      },
+      "parts": [
+        {
+          "id": "part_opencode_user_text",
+          "sessionID": "example-opencode-session",
+          "messageID": "msg_opencode_user",
+          "type": "text",
+          "text": "Inspect the lint failure and patch it."
+        },
+        {
+          "id": "part_opencode_user_file",
+          "sessionID": "example-opencode-session",
+          "messageID": "msg_opencode_user",
+          "type": "file",
+          "mime": "text/plain",
+          "filename": "src/index.ts",
+          "url": "file:///redacted/opencode-project/src/index.ts",
+          "source": {
+            "type": "file",
+            "path": "src/index.ts",
+            "text": {
+              "value": "const unused = true;",
+              "start": 0,
+              "end": 20
+            }
+          }
+        }
+      ]
+    },
+    {
+      "info": {
+        "id": "msg_opencode_assistant",
+        "sessionID": "example-opencode-session",
+        "role": "assistant",
+        "parentID": "msg_opencode_user",
+        "modelID": "qwen-coder-example",
+        "providerID": "openai",
+        "agent": "build",
+        "time": {
+          "created": 1782720001000,
+          "completed": 1782720060000
+        }
+      },
+      "parts": [
+        {
+          "id": "part_opencode_reasoning",
+          "sessionID": "example-opencode-session",
+          "messageID": "msg_opencode_assistant",
+          "type": "reasoning",
+          "text": "The unused variable is likely the only lint blocker.",
+          "time": {
+            "start": 1782720001000,
+            "end": 1782720002000
+          }
+        },
+        {
+          "id": "part_opencode_text",
+          "sessionID": "example-opencode-session",
+          "messageID": "msg_opencode_assistant",
+          "type": "text",
+          "text": "I will run lint first."
+        },
+        {
+          "id": "part_opencode_tool",
+          "sessionID": "example-opencode-session",
+          "messageID": "msg_opencode_assistant",
+          "type": "tool",
+          "callID": "call_opencode_1",
+          "tool": "shell",
+          "state": {
+            "status": "completed",
+            "input": {
+              "cmd": "npm run lint"
+            },
+            "output": "src/index.ts:12:7 error no-unused-vars",
+            "title": "Run lint",
+            "metadata": {},
+            "time": {
+              "start": 1782720003000,
+              "end": 1782720060000
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

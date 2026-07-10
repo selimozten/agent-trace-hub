@@ -1,0 +1,79 @@
+{
+  "sessionId": "example-continue-session",
+  "title": "Handle the empty state",
+  "workspaceDirectory": "/redacted/continue-project",
+  "mode": "agent",
+  "chatModelTitle": "gpt-compatible-example",
+  "history": [
+    {
+      "message": {
+        "role": "user",
+        "content": "Update the React component to handle empty state."
+      },
+      "contextItems": [
+        {
+          "name": "List.tsx",
+          "description": "Selected component",
+          "content": "export function List({ items }) { return <ul>{items.map(...)}</ul>; }",
+          "id": {
+            "providerTitle": "file",
+            "itemId": "src/components/List.tsx"
+          }
+        }
+      ]
+    },
+    {
+      "message": {
+        "role": "thinking",
+        "content": "The component needs an early return for an empty array."
+      },
+      "contextItems": []
+    },
+    {
+      "message": {
+        "role": "assistant",
+        "content": "I will inspect the component before editing.",
+        "toolCalls": [
+          {
+            "id": "call_continue_1",
+            "type": "function",
+            "function": {
+              "name": "read_file",
+              "arguments": "{\"path\":\"src/components/List.tsx\"}"
+            }
+          }
+        ]
+      },
+      "contextItems": [],
+      "toolCallStates": [
+        {
+          "toolCallId": "call_continue_1",
+          "toolCall": {
+            "id": "call_continue_1",
+            "type": "function",
+            "function": {
+              "name": "read_file",
+              "arguments": "{\"path\":\"src/components/List.tsx\"}"
+            }
+          },
+          "status": "done",
+          "parsedArgs": {
+            "path": "src/components/List.tsx"
+          },
+          "output": [
+            {
+              "content": "export function List({ items }) { return <ul>{items.map(...)}</ul>; }",
+              "name": "Tool Result: read_file",
+              "description": "Tool execution result"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "usage": {
+    "totalCost": 0.01,
+    "promptTokens": 100,
+    "completionTokens": 30
+  }
+}

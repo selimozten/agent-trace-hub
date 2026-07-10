@@ -6,7 +6,7 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 
 | Stage | Status | Notes |
 | --- | --- | --- |
-| Discover local trace files | yes | `discover` scans known Codex, Claude Code, Cursor, OpenCode, Continue, Goose, Pi, and project-local Aider paths and emits a JSONL manifest. |
+| Discover local trace files | partial | `discover` scans native Codex, Claude Code, Cursor, Continue, Pi, and Aider files plus compatibility-export paths; current SQLite-backed OpenCode and Goose stores still require upstream JSON export. |
 | Ingest discovery manifests | yes | `ingest` normalizes mixed-source discovery manifests into a canonical shard with optional error reporting. |
 | Normalize raw traces | yes | Converts supported sources into `agent_trace_v1`. |
 | Validate canonical shards | yes | Validates required canonical structure and message/tool-call invariants. |
@@ -27,9 +27,9 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 | Claude Code | yes | yes | yes | Handles nested `message`, thinking, text, tool use, and tool result blocks. |
 | Codex | yes | yes | yes | Handles rollout envelopes, response items, reasoning summaries, function calls, and tool outputs. |
 | Cursor | yes | yes | yes | Handles Cursor `agent-transcripts` JSONL with top-level role and nested message content. |
-| OpenCode | yes | no | yes | Explicit source alias for OpenAI-compatible exported JSONL; native private store parser still needs real samples. |
-| Continue | yes | no | yes | Explicit source alias for OpenAI-compatible exported JSONL; IDE extension state parser still needs real samples. |
-| Goose | yes | no | yes | Explicit source alias for OpenAI-compatible exported JSONL; native session parser still needs real samples. |
+| OpenCode | yes | yes | yes | Handles official session-export JSON, including typed parts, reasoning, files, and tool state; older OpenAI-shaped exports remain compatible. |
+| Continue | yes | yes | yes | Handles native `.continue/sessions/*.json`, context items, thinking, and embedded tool states. |
+| Goose | yes | yes | yes | Handles official session-export JSON, typed conversation content, thinking, tool requests, and tool responses. |
 | Aider markdown history | yes | yes | yes | Handles common markdown role sections and `####` user prompts. |
 | Markdown transcript | yes | yes | yes | Generic explicit role-heading transcript fallback. |
 | OpenAI-compatible chat | yes | yes | yes | Covers harnesses that persist OpenAI Chat Completions-style `messages`. |
@@ -43,15 +43,17 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 | Source adapter registry | yes | Adapter metadata and registration live in `src/source-adapters.ts` so new harness parsers can be added without changing normalize command flow. |
 | Registry introspection | yes | `sources` exposes support level, detection policy, source format, and default agent from the executable registry. |
 | Strict input parsing | yes | Active writers are retried briefly; persistent malformed JSON/JSONL fails with source location, and partial recovery is explicit. |
-| Per-source implementation files | partial | Parser implementations still share `src/normalize.ts`; split into per-source modules as native OpenCode/Continue/Goose samples become available. |
+| Per-source implementation files | partial | Parser implementations still share `src/normalize.ts`; split them into source-local modules as the registry grows. |
 
 ## Next Source Adapters
 
 | Harness/source | Priority | Notes |
 | --- | --- | --- |
-| OpenCode native logs | high | Add a verified parser for local/session-store logs if they differ from OpenAI-compatible exports. |
-| Continue native logs | medium | Often stores chat/session data in IDE extension state. |
-| Goose native logs | medium | Tool-call/session schema should map cleanly to canonical messages once real samples are available. |
+| Gemini CLI | high | Add native session discovery and typed tool-call normalization. |
+| Cline / Roo Code | high | Add VS Code global-storage discovery and task-history normalization. |
+| OpenHands | medium | Add event-history export normalization. |
+| OpenCode SQLite store | medium | Export JSON is supported; add direct multi-session extraction from the current database. |
+| Goose SQLite store | medium | Export JSON is supported; add direct multi-session extraction from `sessions.db`. |
 | raw OpenAI chat logs | done | Useful fallback adapter for many harnesses. |
 | raw Anthropic messages | done | Useful fallback adapter for Claude-derived traces. |
 
@@ -75,8 +77,8 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 
 ## Production Hardening
 
-- Add native OpenCode, Continue, and Goose parsers once real local-session samples are available.
 - Split native parser implementations into source-local modules behind the registry seam.
+- Add direct multi-session extractor support for SQLite-backed harness stores.
 - Validate discovery candidates against adapter detection before assigning high confidence.
 - Add preference-pair renderers when quality labels or rejected alternatives are available.
 - Before any external publication, choose explicit project and dataset licenses and run a redistribution review.

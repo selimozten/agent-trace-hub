@@ -107,7 +107,7 @@ export interface DiscoveredTrace {
   source: Exclude<NormalizeSource, "auto">;
   normalize_source: Exclude<NormalizeSource, "auto">;
   path: string;
-  kind: "jsonl" | "markdown" | "unknown";
+  kind: "json" | "jsonl" | "markdown" | "unknown";
   confidence: "high" | "medium" | "low";
   reason: string;
 }

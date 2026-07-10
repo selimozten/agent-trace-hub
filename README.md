@@ -22,7 +22,10 @@ Implemented:
 - `normalize` adapters for Pi, Claude Code, and Codex JSONL traces
 - native `cursor` transcript adapter
 - `aider` and `markdown-transcript` adapters for markdown-style CLI histories
-- explicit `opencode`, `continue`, and `goose` aliases for OpenAI-compatible JSONL exports
+- native OpenCode session-export JSON with typed message parts, reasoning, files, tools, and tool results
+- native Continue session JSON with context items, thinking, tool states, and tool output
+- native Goose session-export JSON with typed conversation content, thinking, tool requests, and tool responses
+- backward-compatible OpenAI-shaped import for older OpenCode, Continue, and Goose exports
 - generic `openai-chat` and `anthropic-messages` adapters for harnesses that already export API-shaped message logs
 - `generic-json` fallback adapter for nested role/content exports such as `history`, `conversation`, `events`, or `transcript`
 - preservation of source tool schemas when API-shaped exports include them
@@ -44,7 +47,8 @@ Implemented:
 
 Planned:
 
-- additional source adapters for OpenCode, Continue, and Goose when their native logs differ from API-shaped logs
+- source adapters for Gemini CLI, Cline/Roo Code, OpenHands, and other major harnesses
+- direct extraction from SQLite-backed OpenCode and Goose local stores
 - additional training-target renderers such as TRL preference pairs and DPO/ORPO pairs
 
 ## Usage
@@ -90,7 +94,18 @@ Supported source values:
 - `aider`
 - `markdown-transcript`
 
-`opencode`, `continue`, and `goose` currently expect OpenAI-compatible exported JSONL: either one line with a `messages` array or one message per JSONL line. Native private session-store parsers should be added against real samples when those formats differ.
+Native OpenCode and Goose stores are SQLite-backed, so use their upstream JSON export commands before normalization:
+
+```bash
+opencode export <session-id> > raw/opencode-session.json
+
+goose session export \
+  --session-id <session-id> \
+  --format json \
+  --output raw/goose-session.json
+```
+
+Continue CLI sessions are stored as `~/.continue/sessions/*.json` and are discovered directly. OpenCode, Continue, and Goose also retain explicit compatibility support for older OpenAI-shaped JSONL exports.
 
 Run `agent-trace-hub sources --json` to inspect the executable adapter registry. Each source is labeled `native`, `compatibility`, or `fallback`, and reports whether auto-detection is enabled.
 
@@ -98,7 +113,7 @@ Run `agent-trace-hub sources --json` to inspect the executable adapter registry.
 
 JSON and JSONL parsing is strict by default so corrupt rows cannot disappear silently. Active JSONL files are retried briefly when a writer is finishing a line, and persistent failures report the file and line number. `normalize`, `normalize-dir`, and `ingest` accept `--skip-invalid-lines` when partial recovery is intentional; the command still fails if no valid object records remain.
 
-`discover` emits a JSONL manifest of candidate trace files with `source`, `normalize_source`, `path`, `kind`, `confidence`, and `reason`. It scans known harness locations under `--root`, including Codex, Claude Code, Cursor, OpenCode, Continue, Goose, Pi, and project-local Aider history files.
+`discover` emits a JSONL manifest of candidate trace files with `source`, `normalize_source`, `path`, `kind`, `confidence`, and `reason`. It scans known harness locations under `--root`, including Codex, Claude Code, Cursor, Continue, compatibility exports for OpenCode and Goose, Pi, and project-local Aider history files. Run the export commands above for current SQLite-backed OpenCode and Goose stores.
 
 `ingest` reads that manifest and uses each row's `normalize_source`, so one shard can contain mixed Codex, Claude Code, Cursor, Aider, OpenAI-compatible, Anthropic-compatible, generic JSON, Pi, OpenCode, Continue, and Goose exports.
 
@@ -265,7 +280,9 @@ npm run build
 
 `npm test` regenerates the examples and verifies:
 
-- Pi, Claude Code, Codex, Cursor, Aider, Markdown transcript, OpenAI-chat, and Anthropic-message normalization
+- Pi, Claude Code, Codex, Cursor, OpenCode, Continue, Goose, Aider, Markdown transcript, OpenAI-chat, and Anthropic-message normalization
+- native OpenCode/Continue/Goose reasoning, context, tool-call, and tool-result preservation
+- OpenCode/Continue/Goose compatibility import and native auto-detection
 - adapter registry coverage, support labels, and compatibility auto-detection invariants
 - active-writer retry, strict malformed JSON/JSONL rejection, and explicit partial JSONL recovery
 - local trace discovery for supported harness directories

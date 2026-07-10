@@ -10,9 +10,9 @@ const fixtures = [
   ["claude-code", "examples/claude-code-session.jsonl", "examples/claude-code-session.agent_trace_v1.jsonl"],
   ["codex", "examples/codex-session.jsonl", "examples/codex-session.agent_trace_v1.jsonl"],
   ["cursor", "examples/cursor-session.jsonl", "examples/cursor-session.agent_trace_v1.jsonl"],
-  ["opencode", "examples/opencode-session.jsonl", "examples/opencode-session.agent_trace_v1.jsonl"],
-  ["continue", "examples/continue-session.jsonl", "examples/continue-session.agent_trace_v1.jsonl"],
-  ["goose", "examples/goose-session.jsonl", "examples/goose-session.agent_trace_v1.jsonl"],
+  ["opencode", "examples/opencode-session.json", "examples/opencode-session.agent_trace_v1.jsonl"],
+  ["continue", "examples/continue-session.json", "examples/continue-session.agent_trace_v1.jsonl"],
+  ["goose", "examples/goose-session.json", "examples/goose-session.agent_trace_v1.jsonl"],
   ["openai-chat", "examples/openai-chat-session.jsonl", "examples/openai-chat-session.agent_trace_v1.jsonl"],
   ["anthropic-messages", "examples/anthropic-messages-session.jsonl", "examples/anthropic-messages-session.agent_trace_v1.jsonl"],
   ["generic-json", "examples/generic-json-session.json", "examples/generic-json-session.agent_trace_v1.jsonl"],
@@ -32,8 +32,35 @@ for (const [source] of fixtures) {
 }
 for (const source of ["opencode", "continue", "goose"]) {
   const entry = sourceRegistry.find((candidate) => candidate.source === source);
-  assert(entry.support === "compatibility", `${source} should be labeled as compatibility support`);
-  assert(entry.autoDetect === false, `${source} compatibility adapter must require an explicit source`);
+  assert(entry.support === "native", `${source} should be labeled as native support`);
+  assert(entry.autoDetect === true, `${source} native adapter should auto-detect its export`);
+}
+
+const nativeOpenCode = readJsonl(path.join(root, "examples/opencode-session.agent_trace_v1.jsonl"))[0];
+assert(nativeOpenCode.source.source_format === "opencode-session-export-json", "OpenCode native source format mismatch");
+assert(nativeOpenCode.messages.some((message) => message.reasoning?.[0]?.text.includes("unused variable")), "OpenCode reasoning should be preserved");
+assert(nativeOpenCode.messages.some((message) => message.tool_calls?.[0]?.name === "shell"), "OpenCode tool call should be preserved");
+assert(nativeOpenCode.messages.some((message) => message.role === "tool" && message.tool_call_id === "call_opencode_1"), "OpenCode tool result should be preserved");
+
+const nativeContinue = readJsonl(path.join(root, "examples/continue-session.agent_trace_v1.jsonl"))[0];
+assert(nativeContinue.source.source_format === "continue-session-json", "Continue native source format mismatch");
+assert(nativeContinue.messages[0].content[0].text.includes("<context name=\"List.tsx\">"), "Continue context items should be preserved");
+assert(nativeContinue.messages.some((message) => message.reasoning?.[0]?.text.includes("early return")), "Continue thinking should be preserved");
+assert(nativeContinue.messages.some((message) => message.role === "tool" && message.name === "read_file"), "Continue tool result should be preserved");
+
+const nativeGoose = readJsonl(path.join(root, "examples/goose-session.agent_trace_v1.jsonl"))[0];
+assert(nativeGoose.source.source_format === "goose-session-export-json", "Goose native source format mismatch");
+assert(nativeGoose.messages.some((message) => message.reasoning?.[0]?.text.includes("parser edge case")), "Goose thinking should be preserved");
+assert(nativeGoose.messages.some((message) => message.tool_calls?.[0]?.name === "shell"), "Goose tool request should be preserved");
+assert(nativeGoose.messages.some((message) => message.role === "tool" && message.tool_call_id === "call_goose_1"), "Goose tool response should be preserved");
+
+const compatibilityOutputs = [];
+for (const source of ["opencode", "continue", "goose"]) {
+  const output = path.join(root, `examples/.tmp-${source}-compat.agent_trace_v1.jsonl`);
+  compatibilityOutputs.push(output);
+  run([...nodeArgs, "normalize", "--source", source, "--input", `examples/${source}-session.jsonl`, "--output", output]);
+  run([...nodeArgs, "validate", "--input", output]);
+  assert(readJsonl(output)[0].source.source_format === `${source}-openai-compatible-jsonl`, `${source} compatibility source format mismatch`);
 }
 
 run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/codex-session.jsonl", "--output", "examples/codex-session.auto.agent_trace_v1.jsonl"]);
@@ -46,6 +73,13 @@ run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/generic-
 run([...nodeArgs, "validate", "--input", "examples/generic-json-session.auto.agent_trace_v1.jsonl"]);
 run([...nodeArgs, "normalize", "--source", "auto", "--input", "examples/aider-history.md", "--output", "examples/aider-history.auto.agent_trace_v1.jsonl"]);
 run([...nodeArgs, "validate", "--input", "examples/aider-history.auto.agent_trace_v1.jsonl"]);
+for (const source of ["opencode", "continue", "goose"]) {
+  const output = path.join(root, `examples/.tmp-${source}-auto.agent_trace_v1.jsonl`);
+  run([...nodeArgs, "normalize", "--source", "auto", "--input", `examples/${source}-session.json`, "--output", output]);
+  run([...nodeArgs, "validate", "--input", output]);
+  assert(readJsonl(output)[0].source.agent === source, `auto-detection should select ${source}`);
+  compatibilityOutputs.push(output);
+}
 
 const malformedJsonl = path.join(root, "examples/.tmp-malformed-codex.jsonl");
 const recoveredJsonl = path.join(root, "examples/.tmp-recovered-codex.agent_trace_v1.jsonl");
@@ -128,7 +162,7 @@ for (const file of [
   ".claude/projects/example/session.jsonl",
   ".cursor/projects/example/agent-transcripts/session/transcript.jsonl",
   ".local/share/opencode/sessions/session.jsonl",
-  ".continue/sessions/session.jsonl",
+  ".continue/sessions/session.json",
   ".config/goose/sessions/session.jsonl",
   ".pi/sessions/session.jsonl",
 ]) {
@@ -156,13 +190,13 @@ const ingestOutput = path.join(root, "examples/.tmp-ingested.agent_trace_v1.json
 const ingestEntries = [
   ["codex", "examples/codex-session.jsonl"],
   ["cursor", "examples/cursor-session.jsonl"],
-  ["opencode", "examples/opencode-session.jsonl"],
+  ["opencode", "examples/opencode-session.json"],
   ["aider", "examples/aider-history.md"],
 ].map(([source, file]) => ({
   source,
   normalize_source: source,
   path: path.relative(path.dirname(ingestManifest), path.join(root, file)),
-  kind: file.endsWith(".md") ? "markdown" : "jsonl",
+  kind: file.endsWith(".md") ? "markdown" : file.endsWith(".json") ? "json" : "jsonl",
   confidence: "high",
   reason: "fixture",
 }));
@@ -328,7 +362,7 @@ assertInvalidArtifact("agent-trace", [{ schema: "agent_trace_v1", session_id: "b
 for (const source of ["opencode", "continue", "goose"]) {
   assertJsonl(`examples/${source}-session.agent_trace_v1.jsonl`, (trace) => {
     assert(trace.source.agent === source, `${source} fixture should preserve explicit source agent`);
-    assert(trace.source.source_format === `${source}-openai-compatible-jsonl`, `${source} fixture source_format mismatch`);
+    assert(trace.source.source_format === sourceRegistry.find((entry) => entry.source === source)?.sourceFormat, `${source} fixture source_format mismatch`);
   });
 }
 
@@ -338,6 +372,7 @@ fs.rmSync(path.join(root, "examples/anthropic-messages-session.auto.agent_trace_
 fs.rmSync(path.join(root, "examples/cursor-session.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(path.join(root, "examples/generic-json-session.auto.agent_trace_v1.jsonl"), { force: true });
 fs.rmSync(path.join(root, "examples/aider-history.auto.agent_trace_v1.jsonl"), { force: true });
+for (const output of compatibilityOutputs) fs.rmSync(output, { force: true });
 fs.rmSync(malformedJsonl, { force: true });
 fs.rmSync(malformedJson, { force: true });
 fs.rmSync(recoveredJsonl, { force: true });

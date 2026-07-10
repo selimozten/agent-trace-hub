@@ -61,11 +61,20 @@ const DISCOVERY_PATTERNS: DiscoveryPattern[] = [
   {
     source: "continue",
     normalizeSource: "continue",
-    roots: [".continue", ".config/continue"],
+    roots: [".continue/sessions"],
+    extensions: [".json"],
+    kind: "json",
+    confidence: "high",
+    reason: "Continue native CLI session JSON directory",
+  },
+  {
+    source: "continue",
+    normalizeSource: "continue",
+    roots: [".config/continue"],
     extensions: [".jsonl"],
     kind: "jsonl",
     confidence: "medium",
-    reason: "Continue local/export JSONL candidate",
+    reason: "Continue OpenAI-compatible JSONL candidate",
   },
   {
     source: "goose",

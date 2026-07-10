@@ -9,7 +9,7 @@
     "source": { "$ref": "#/$defs/source" },
     "normalize_source": { "$ref": "#/$defs/source" },
     "path": { "type": "string", "minLength": 1 },
-    "kind": { "enum": ["jsonl", "markdown", "unknown"] },
+    "kind": { "enum": ["json", "jsonl", "markdown", "unknown"] },
     "confidence": { "enum": ["high", "medium", "low"] },
     "reason": { "type": "string" }
   },

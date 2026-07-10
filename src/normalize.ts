@@ -19,6 +19,7 @@ import { isRecord } from "./workspace.ts";
 type BaseTraceOverrides = Partial<CanonicalTrace["source"]> & {
   session_id?: string;
   tools?: JsonObject[];
+  metadata?: JsonObject;
 };
 
 class JsonlRecordError extends Error {}
@@ -29,9 +30,9 @@ const ADAPTER_IMPLEMENTATIONS: SourceAdapterImplementations = {
   codex: { detect: detectCodex, normalize: normalizeCodexSession },
   cursor: { detect: detectCursor, normalize: normalizeCursorSession },
   "anthropic-messages": { detect: detectAnthropicMessages, normalize: normalizeAnthropicMessagesSession },
-  opencode: { detect: neverAutoDetect, normalize: normalizeOpenAIChatSession },
-  continue: { detect: neverAutoDetect, normalize: normalizeOpenAIChatSession },
-  goose: { detect: neverAutoDetect, normalize: normalizeOpenAIChatSession },
+  opencode: { detect: detectOpenCode, normalize: normalizeOpenCodeSession },
+  continue: { detect: detectContinue, normalize: normalizeContinueSession },
+  goose: { detect: detectGoose, normalize: normalizeGooseSession },
   "openai-chat": { detect: detectOpenAIChat, normalize: normalizeOpenAIChatSession },
   "generic-json": { detect: detectGenericJsonChat, normalize: normalizeGenericJsonSession },
   aider: { detect: detectAider, normalize: normalizeMarkdownTranscriptSession },
@@ -51,7 +52,7 @@ export async function runNormalize(options: NormalizeOptions): Promise<void> {
 
 export async function runNormalizeDir(options: NormalizeDirOptions): Promise<void> {
   const files = findJsonlFiles(options.inputDir);
-  if (files.length === 0) throw new Error(`No .jsonl files found in ${options.inputDir}`);
+  if (files.length === 0) throw new Error(`No supported input files found in ${options.inputDir}`);
   const traces: CanonicalTrace[] = [];
 
   for (const file of files) {
@@ -214,10 +215,11 @@ function baseTrace(
       provider: overrides.provider,
       exported_at: overrides.exported_at,
       cwd: overrides.cwd,
-      source_format: adapter.sourceFormat,
+      source_format: overrides.source_format ?? adapter.sourceFormat,
     },
     metadata: {
       source_file: inputPath,
+      ...overrides.metadata,
     },
     tools: overrides.tools ?? [],
     messages,
@@ -230,10 +232,6 @@ function baseTrace(
 export function detectPi(records: JsonObject[]): boolean {
   return records.some((record) => record.type === "session" && typeof record.version === "number" && typeof record.id === "string")
     && records.some((record) => record.type === "message" && isRecord(record.message));
-}
-
-export function neverAutoDetect(_records: JsonObject[]): boolean {
-  return false;
 }
 
 export function normalizePiSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
@@ -425,13 +423,338 @@ export function normalizeMarkdownTranscriptSession(inputPath: string, records: J
   return baseTrace(inputPath, adapter, options, { session_id: path.basename(inputPath, path.extname(inputPath)) }, messages);
 }
 
+export function detectOpenCode(records: JsonObject[]): boolean {
+  if (records.length !== 1) return false;
+  const root = records[0];
+  if (!isRecord(root.info) || typeof root.info.id !== "string" || !Array.isArray(root.messages)) return false;
+  return root.messages.some((message) => isRecord(message) && isRecord(message.info) && Array.isArray(message.parts));
+}
+
+export function normalizeOpenCodeSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
+  if (!detectOpenCode(records)) return normalizeOpenAIChatSession(inputPath, records, options);
+  const adapter = adapterFor("opencode");
+  const root = records[0];
+  const session = root.info as JsonObject;
+  const sourceMessages = recordsFromArray(root.messages as JsonValue[]);
+  const messages: CanonicalMessage[] = [];
+  const seenSystem = new Set<string>();
+  let model = options.model;
+  let provider: string | undefined;
+
+  const sessionModel = isRecord(session.model) ? session.model : undefined;
+  model = model ?? firstString(sessionModel, ["id", "modelID", "modelId"]);
+  provider = firstString(sessionModel, ["providerID", "providerId", "provider"]);
+
+  for (const sourceMessage of sourceMessages) {
+    if (!isRecord(sourceMessage.info) || !Array.isArray(sourceMessage.parts)) continue;
+    const info = sourceMessage.info as JsonObject;
+    const infoModel = isRecord(info.model) ? info.model : undefined;
+    model = model ?? firstString(infoModel, ["id", "modelID", "modelId"]) ?? firstString(info, ["modelID", "modelId"]);
+    provider = provider ?? firstString(infoModel, ["providerID", "providerId", "provider"]) ?? firstString(info, ["providerID", "providerId"]);
+
+    if (typeof info.system === "string" && info.system && !seenSystem.has(info.system)) {
+      seenSystem.add(info.system);
+      messages.push({ role: "system", content: [{ type: "text", text: info.system }] });
+    }
+    messages.push(...normalizeOpenCodeMessage(info, recordsFromArray(sourceMessage.parts as JsonValue[])));
+  }
+
+  const metadata: JsonObject = {};
+  if (typeof session.title === "string") metadata.title = session.title;
+  if (typeof session.version === "string") metadata.source_version = session.version;
+  if (typeof session.projectID === "string") metadata.project_id = session.projectID;
+  return baseTrace(inputPath, adapter, { ...options, model }, {
+    session_id: session.id as string,
+    cwd: typeof session.directory === "string" ? session.directory : undefined,
+    exported_at: epochToIso(readEpoch(session.time, ["updated", "created"])),
+    model,
+    provider,
+    metadata,
+  }, messages);
+}
+
+function normalizeOpenCodeMessage(info: JsonObject, parts: JsonObject[]): CanonicalMessage[] {
+  const role = info.role;
+  if (role !== "user" && role !== "assistant") return [];
+  const out: CanonicalMessage = { role };
+  const content: CanonicalContentBlock[] = [];
+  const reasoning: CanonicalContentBlock[] = [];
+  const toolCalls: CanonicalToolCall[] = [];
+  const toolResults: CanonicalMessage[] = [];
+
+  for (const part of parts) {
+    if (part.type === "text" && typeof part.text === "string" && part.text && part.ignored !== true) {
+      content.push({ type: "text", text: part.text });
+      continue;
+    }
+    if (part.type === "reasoning" && typeof part.text === "string" && part.text) {
+      reasoning.push({ type: "text", text: part.text });
+      continue;
+    }
+    if (part.type === "file") {
+      content.push(...normalizeOpenCodeFilePart(part));
+      continue;
+    }
+    if (part.type !== "tool" || typeof part.callID !== "string" || typeof part.tool !== "string") continue;
+    const state = isRecord(part.state) ? part.state : {};
+    toolCalls.push({
+      id: part.callID,
+      name: part.tool,
+      arguments: isRecord(state.input) ? state.input as JsonObject : {},
+    });
+    const status = typeof state.status === "string" ? state.status : "unknown";
+    const output = status === "completed" ? state.output : status === "error" ? state.error : "[Tool execution was interrupted]";
+    toolResults.push({
+      role: "tool",
+      tool_call_id: part.callID,
+      name: part.tool,
+      content: normalizeTextLike(output as JsonValue | undefined),
+      metadata: { status },
+    });
+  }
+
+  if (content.length > 0) out.content = content;
+  if (reasoning.length > 0 && role === "assistant") out.reasoning = reasoning;
+  if (toolCalls.length > 0 && role === "assistant") out.tool_calls = toolCalls;
+  const normalized = Object.keys(out).length > 1 ? [out] : [];
+  return role === "assistant" ? [...normalized, ...toolResults] : normalized;
+}
+
+function normalizeOpenCodeFilePart(part: JsonObject): CanonicalContentBlock[] {
+  const mime = typeof part.mime === "string" ? part.mime : undefined;
+  const url = typeof part.url === "string" ? part.url : undefined;
+  const image = parseDataUrl(url, mime);
+  if (image) return [image];
+  const source = isRecord(part.source) ? part.source : undefined;
+  const sourceText = isRecord(source?.text) && typeof source.text.value === "string" ? source.text.value : undefined;
+  if (sourceText) return [{ type: "text", text: sourceText }];
+  const label = firstString(part, ["filename"]) ?? (url && !url.startsWith("data:") ? url : "file");
+  return [{ type: "text", text: `[Attached ${mime ?? "file"}: ${label}]` }];
+}
+
+export function detectContinue(records: JsonObject[]): boolean {
+  if (records.length !== 1) return false;
+  const root = records[0];
+  return typeof root.sessionId === "string"
+    && Array.isArray(root.history)
+    && root.history.some((item) => isRecord(item) && isRecord(item.message) && typeof item.message.role === "string");
+}
+
+export function normalizeContinueSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
+  if (!detectContinue(records)) return normalizeOpenAIChatSession(inputPath, records, options);
+  const adapter = adapterFor("continue");
+  const root = records[0];
+  const messages: CanonicalMessage[] = [];
+  let pendingReasoning: CanonicalContentBlock[] = [];
+
+  for (const item of recordsFromArray(root.history as JsonValue[])) {
+    if (!isRecord(item.message)) continue;
+    const message = item.message as JsonObject;
+    if (message.role === "thinking") {
+      pendingReasoning.push(...normalizeContentBlocks(message.content));
+      continue;
+    }
+
+    if (message.role === "assistant") {
+      const out: CanonicalMessage = { role: "assistant" };
+      const content = normalizeContentBlocks(message.content);
+      const itemReasoning = isRecord(item.reasoning) && typeof item.reasoning.text === "string"
+        ? [{ type: "text" as const, text: item.reasoning.text }]
+        : [];
+      const toolStates = Array.isArray(item.toolCallStates) ? recordsFromArray(item.toolCallStates as JsonValue[]) : [];
+      const calls = normalizeContinueToolCalls(message, toolStates);
+      if (content.length > 0) out.content = content;
+      const reasoning = [...pendingReasoning, ...itemReasoning];
+      if (reasoning.length > 0) out.reasoning = reasoning;
+      if (calls.length > 0) out.tool_calls = calls;
+      pendingReasoning = [];
+      if (Object.keys(out).length > 1) messages.push(out);
+      messages.push(...normalizeContinueToolResults(toolStates));
+      continue;
+    }
+
+    if (pendingReasoning.length > 0) {
+      messages.push({ role: "assistant", reasoning: pendingReasoning });
+      pendingReasoning = [];
+    }
+    if (message.role === "user") {
+      const context = normalizeContinueContext(item.contextItems);
+      const content = [...context, ...normalizeContentBlocks(message.content)];
+      if (content.length > 0) messages.push({ role: "user", content });
+    } else if (message.role === "system") {
+      messages.push(...splitUserLikeMessage("system", message.content));
+    } else if (message.role === "tool") {
+      messages.push({
+        role: "tool",
+        tool_call_id: firstString(message, ["toolCallId", "tool_call_id"]),
+        name: firstString(message, ["name"]) ?? "tool",
+        content: normalizeContentBlocks(message.content),
+      });
+    }
+  }
+  if (pendingReasoning.length > 0) messages.push({ role: "assistant", reasoning: pendingReasoning });
+
+  const metadata: JsonObject = {};
+  if (typeof root.title === "string") metadata.title = root.title;
+  if (typeof root.mode === "string") metadata.mode = root.mode;
+  return baseTrace(inputPath, adapter, { ...options, model: options.model ?? firstString(root, ["chatModelTitle"]) }, {
+    session_id: root.sessionId as string,
+    cwd: typeof root.workspaceDirectory === "string" ? root.workspaceDirectory : undefined,
+    model: options.model ?? firstString(root, ["chatModelTitle"]),
+    metadata,
+  }, messages);
+}
+
+function normalizeContinueContext(value: JsonValue | undefined): CanonicalContentBlock[] {
+  if (!Array.isArray(value)) return [];
+  const text = recordsFromArray(value)
+    .filter((item) => typeof item.content === "string")
+    .map((item) => `<context name="${typeof item.name === "string" ? item.name : "context"}">\n${item.content}\n</context>`)
+    .join("\n\n");
+  return text ? [{ type: "text", text }] : [];
+}
+
+function normalizeContinueToolCalls(message: JsonObject, states: JsonObject[]): CanonicalToolCall[] {
+  if (states.length > 0) {
+    return states.map((state, index) => {
+      const call = isRecord(state.toolCall) ? state.toolCall : {};
+      const fn = isRecord(call.function) ? call.function : {};
+      return {
+        id: firstString(state, ["toolCallId"]) ?? firstString(call, ["id"]) ?? `call_${index + 1}`,
+        name: firstString(fn, ["name"]) ?? "tool",
+        arguments: isRecord(state.parsedArgs) ? state.parsedArgs as JsonObject : parseArguments(fn.arguments as JsonValue | undefined),
+      };
+    });
+  }
+  const calls = Array.isArray(message.toolCalls) ? message.toolCalls : [];
+  return calls.map((call, index) => normalizeOpenAIToolCall(call, index)).filter((call): call is CanonicalToolCall => call !== undefined);
+}
+
+function normalizeContinueToolResults(states: JsonObject[]): CanonicalMessage[] {
+  return states.map((state) => {
+    const call = isRecord(state.toolCall) ? state.toolCall : {};
+    const fn = isRecord(call.function) ? call.function : {};
+    const output = Array.isArray(state.output)
+      ? recordsFromArray(state.output as JsonValue[]).map((item) => typeof item.content === "string" ? item.content : "").filter(Boolean).join("\n")
+      : "";
+    const status = typeof state.status === "string" ? state.status : "unknown";
+    return {
+      role: "tool" as const,
+      tool_call_id: firstString(state, ["toolCallId"]) ?? firstString(call, ["id"]),
+      name: firstString(fn, ["name"]) ?? "tool",
+      content: [{ type: "text" as const, text: output || (status === "canceled" ? "Tool cancelled" : `[Tool ${status}]`) }],
+      metadata: { status },
+    };
+  });
+}
+
+export function detectGoose(records: JsonObject[]): boolean {
+  if (records.length !== 1) return false;
+  const root = records[0];
+  return typeof root.id === "string"
+    && typeof root.working_dir === "string"
+    && Array.isArray(root.conversation)
+    && root.conversation.some((message) => isRecord(message) && typeof message.role === "string" && Array.isArray(message.content));
+}
+
+export function normalizeGooseSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
+  if (!detectGoose(records)) return normalizeOpenAIChatSession(inputPath, records, options);
+  const adapter = adapterFor("goose");
+  const root = records[0];
+  const messages: CanonicalMessage[] = [];
+  const toolNames = new Map<string, string>();
+  for (const message of recordsFromArray(root.conversation as JsonValue[])) {
+    messages.push(...normalizeGooseMessage(message, toolNames));
+  }
+
+  const modelConfig = isRecord(root.model_config) ? root.model_config : undefined;
+  const model = options.model ?? firstString(modelConfig, ["model", "model_name", "modelName", "name"]);
+  const provider = firstString(root, ["provider_name"]) ?? firstString(modelConfig, ["provider", "provider_name", "providerName"]);
+  const metadata: JsonObject = {};
+  if (typeof root.name === "string") metadata.title = root.name;
+  if (typeof root.session_type === "string") metadata.session_type = root.session_type;
+  if (typeof root.goose_mode === "string") metadata.mode = root.goose_mode;
+  return baseTrace(inputPath, adapter, { ...options, model }, {
+    session_id: root.id as string,
+    cwd: root.working_dir as string,
+    exported_at: firstString(root, ["updated_at", "created_at"]),
+    model,
+    provider,
+    metadata,
+  }, messages);
+}
+
+function normalizeGooseMessage(message: JsonObject, toolNames: Map<string, string>): CanonicalMessage[] {
+  const sourceRole = message.role;
+  if (sourceRole !== "user" && sourceRole !== "assistant") return [];
+  const out: CanonicalMessage = { role: sourceRole };
+  const content: CanonicalContentBlock[] = [];
+  const reasoning: CanonicalContentBlock[] = [];
+  const toolCalls: CanonicalToolCall[] = [];
+  const toolResults: CanonicalMessage[] = [];
+
+  for (const block of recordsFromArray(message.content as JsonValue[])) {
+    if (block.type === "text" && typeof block.text === "string" && block.text) {
+      content.push({ type: "text", text: block.text });
+    } else if ((block.type === "thinking" || block.type === "reasoning") && typeof (block.thinking ?? block.text) === "string") {
+      reasoning.push({ type: "text", text: String(block.thinking ?? block.text) });
+    } else if (block.type === "image") {
+      content.push({
+        type: "image",
+        mime_type: firstString(block, ["mimeType", "mime_type"]),
+        data: typeof block.data === "string" ? block.data : undefined,
+      });
+    } else if (block.type === "toolRequest" || block.type === "frontendToolRequest") {
+      const callResult = isRecord(block.toolCall) ? block.toolCall : undefined;
+      const call = callResult?.status === "success" && isRecord(callResult.value) ? callResult.value : undefined;
+      if (!call) continue;
+      const id = firstString(block, ["id"]) ?? `call_${toolCalls.length + 1}`;
+      const name = firstString(call, ["name"]) ?? "tool";
+      toolNames.set(id, name);
+      toolCalls.push({ id, name, arguments: isRecord(call.arguments) ? call.arguments as JsonObject : {} });
+    } else if (block.type === "toolResponse") {
+      const id = firstString(block, ["id"]);
+      const result = isRecord(block.toolResult) ? block.toolResult : undefined;
+      const resultContent = result?.status === "success" ? normalizeGooseToolResult(result.value as JsonValue | undefined) : normalizeTextLike(result?.error as JsonValue | undefined);
+      toolResults.push({
+        role: "tool",
+        tool_call_id: id,
+        name: id ? toolNames.get(id) ?? "tool" : "tool",
+        content: resultContent,
+        metadata: { status: typeof result?.status === "string" ? result.status : "unknown" },
+      });
+    } else if (block.type === "systemNotification" && typeof block.msg === "string") {
+      content.push({ type: "text", text: block.msg });
+    } else if (block.type === "actionRequired" && isRecord(block.data)) {
+      content.push({ type: "text", text: JSON.stringify(block.data) });
+    }
+  }
+
+  if (content.length > 0) out.content = content;
+  if (sourceRole === "assistant" && reasoning.length > 0) out.reasoning = reasoning;
+  if (sourceRole === "assistant" && toolCalls.length > 0) out.tool_calls = toolCalls;
+  const normalized = Object.keys(out).length > 1 ? [out] : [];
+  return [...normalized, ...toolResults];
+}
+
+function normalizeGooseToolResult(value: JsonValue | undefined): CanonicalContentBlock[] {
+  const items = Array.isArray(value)
+    ? value
+    : isRecord(value) && Array.isArray(value.content)
+      ? value.content
+      : [];
+  const blocks = normalizeContentBlocks(items as JsonValue[]);
+  return blocks.length > 0 ? blocks : normalizeTextLike(value);
+}
+
 export function detectOpenAIChat(records: JsonObject[]): boolean {
   return records.some((record) => Array.isArray(record.messages))
     || records.some((record) => typeof record.role === "string" && ["system", "developer", "user", "assistant", "tool"].includes(record.role));
 }
 
 export function normalizeOpenAIChatSession(inputPath: string, records: JsonObject[], options: NormalizeOptions): CanonicalTrace {
-  const adapter = adapterFor(options.source === "opencode" || options.source === "continue" || options.source === "goose" ? options.source : "openai-chat");
+  const compatibilitySource = options.source === "opencode" || options.source === "continue" || options.source === "goose" ? options.source : undefined;
+  const adapter = adapterFor(compatibilitySource ?? "openai-chat");
   const root = records.length === 1 && Array.isArray(records[0].messages) ? records[0] : undefined;
   const sourceMessages = root ? recordsFromArray(records[0].messages as JsonValue[]) : records;
   const messages: CanonicalMessage[] = [];
@@ -443,7 +766,13 @@ export function normalizeOpenAIChatSession(inputPath: string, records: JsonObjec
     messages.push(...normalizeOpenAIChatMessage(message));
   }
 
-  return baseTrace(inputPath, adapter, { ...options, model }, { session_id: sessionId, model, provider: "openai", tools }, messages);
+  return baseTrace(inputPath, adapter, { ...options, model }, {
+    session_id: sessionId,
+    model,
+    provider: "openai",
+    source_format: compatibilitySource ? `${compatibilitySource}-openai-compatible-jsonl` : undefined,
+    tools,
+  }, messages);
 }
 
 function normalizeOpenAIChatMessage(message: JsonObject): CanonicalMessage[] {
@@ -621,6 +950,41 @@ function firstString(record: JsonObject | undefined, keys: string[]): string | u
     if (typeof value === "string" && value) return value;
   }
   return undefined;
+}
+
+function readEpoch(value: JsonValue | undefined, keys: string[]): number | undefined {
+  if (!isRecord(value)) return undefined;
+  for (const key of keys) {
+    const candidate = value[key];
+    if (typeof candidate === "number" && Number.isFinite(candidate)) return candidate;
+  }
+  return undefined;
+}
+
+function epochToIso(value: number | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const milliseconds = value < 1_000_000_000_000 ? value * 1000 : value;
+  const date = new Date(milliseconds);
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
+}
+
+function parseDataUrl(url: string | undefined, fallbackMime: string | undefined): CanonicalContentBlock | undefined {
+  if (!url?.startsWith("data:")) return undefined;
+  const comma = url.indexOf(",");
+  if (comma < 0) return undefined;
+  const header = url.slice(5, comma);
+  const mime = header.split(";", 1)[0] || fallbackMime;
+  if (!mime?.startsWith("image/")) return undefined;
+  const payload = url.slice(comma + 1);
+  try {
+    return {
+      type: "image",
+      mime_type: mime,
+      data: header.includes(";base64") ? payload : Buffer.from(decodeURIComponent(payload)).toString("base64"),
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 function recordsFromArray(values: JsonValue[]): JsonObject[] {

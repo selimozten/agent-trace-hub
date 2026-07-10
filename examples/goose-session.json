@@ -1,0 +1,94 @@
+{
+  "id": "example-goose-session",
+  "working_dir": "/redacted/goose-project",
+  "name": "Fix parser crash",
+  "user_set_name": true,
+  "session_type": "user",
+  "created_at": "2026-06-29T12:00:00Z",
+  "updated_at": "2026-06-29T12:01:00Z",
+  "extension_data": {},
+  "provider_name": "anthropic",
+  "model_config": {
+    "model": "claude-compatible-example",
+    "provider": "anthropic"
+  },
+  "goose_mode": "approve",
+  "conversation": [
+    {
+      "id": "msg_goose_user",
+      "role": "user",
+      "created": 1782734400000,
+      "content": [
+        {
+          "type": "text",
+          "text": "Run the unit test for the parser and fix the crash."
+        }
+      ],
+      "metadata": {
+        "agentVisible": true,
+        "userVisible": true
+      }
+    },
+    {
+      "id": "msg_goose_assistant",
+      "role": "assistant",
+      "created": 1782734401000,
+      "content": [
+        {
+          "type": "thinking",
+          "thinking": "The failing test output should identify the parser edge case.",
+          "signature": "fixture-signature"
+        },
+        {
+          "type": "text",
+          "text": "I will run the parser test."
+        },
+        {
+          "type": "toolRequest",
+          "id": "call_goose_1",
+          "toolCall": {
+            "status": "success",
+            "value": {
+              "name": "shell",
+              "arguments": {
+                "cmd": "cargo test parser_handles_empty_input"
+              }
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "agentVisible": true,
+        "userVisible": true
+      }
+    },
+    {
+      "id": "msg_goose_tool",
+      "role": "user",
+      "created": 1782734460000,
+      "content": [
+        {
+          "type": "toolResponse",
+          "id": "call_goose_1",
+          "toolResult": {
+            "status": "success",
+            "value": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "thread 'parser_handles_empty_input' panicked at src/parser.rs:44"
+                }
+              ],
+              "isError": false
+            }
+          }
+        }
+      ],
+      "metadata": {
+        "agentVisible": true,
+        "userVisible": true
+      }
+    }
+  ],
+  "message_count": 3
+}
