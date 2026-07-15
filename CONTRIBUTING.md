@@ -1,5 +1,12 @@
 # Contributing
 
+Contributions should preserve the canonical-first design: source adapters
+capture provider detail, `agent_trace_v1` remains portable, and renderers own
+trainer-specific formatting.
+
+Open an issue before a large adapter, schema, or CLI contract change. Small
+bug fixes and fixture improvements can go directly to a pull request.
+
 ## Development
 
 ```bash
@@ -9,6 +16,7 @@ npm test
 npm run build
 npm run build:binary
 npm run test:binary
+npm run test:public
 ```
 
 Use `npm run build:binaries` only when preparing cross-platform release artifacts; it downloads the target Bun runtimes and produces substantially larger build output.
@@ -34,3 +42,14 @@ Use `npm run build:binaries` only when preparing cross-platform release artifact
 ## Safety
 
 Do not commit real private traces, credentials, API keys, cookies, browser profiles, `.env` files, or raw proprietary code dumps. Use synthetic fixtures or heavily redacted examples.
+
+Pull requests that add a source must document its local storage contract and
+state which fields the adapter cannot recover. Never make partial support look
+native by silently dropping reasoning, tool calls, or tool results.
+
+## Pull Requests
+
+- Keep changes scoped and include tests proportional to the parser or schema risk.
+- Update `CHANGELOG.md` under an unreleased section for user-facing behavior.
+- Run `npm run check`, `npm test`, and `npm run test:public`.
+- Do not commit generated `dist/`, `dist-bin/`, `release-assets/`, or trace data.

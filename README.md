@@ -1,92 +1,105 @@
-# agent-trace-hub
+<h1 align="center">Agent Trace Hub</h1>
 
-Collect, review, normalize, and package coding-agent traces.
+<p align="center">
+  <strong>Collect coding-agent traces once. Train any model next.</strong><br />
+  A local-first pipeline for discovering, normalizing, auditing, and rendering agent traces.
+</p>
 
-This project started as a local fork of `badlogic/pi-share-hf`. The original tool has a strong safety pipeline for Pi sessions: deterministic redaction, TruffleHog scanning, deny rules, LLM review, manual rejection, and Hugging Face upload.
+<p align="center">
+  <a href="https://github.com/selimozten/agent-trace-hub/actions/workflows/ci.yml"><img src="https://github.com/selimozten/agent-trace-hub/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/selimozten/agent-trace-hub/releases/latest"><img src="https://img.shields.io/github/v/release/selimozten/agent-trace-hub?display_name=tag&sort=semver" alt="Latest release" /></a>
+  <a href="https://selimozten.github.io/agent-trace-hub/"><img src="https://img.shields.io/website?url=https%3A%2F%2Fselimozten.github.io%2Fagent-trace-hub%2F&label=website" alt="Website" /></a>
+</p>
 
-`agent-trace-hub` keeps that safety workflow and extends the goal: store traces in one canonical format first, then render them into model-specific training formats.
+<p align="center">
+  <img src="site/assets/social-card.png" width="820" alt="Agent Trace Hub canonical trace pipeline" />
+</p>
 
-## Goals
+Agent Trace Hub reads native local stores from Claude Code, Codex, Pi, Oh My
+Pi, OpenCode, and Cursor Agent CLI, then writes one portable
+`agent_trace_v1` JSONL contract. Keep canonical data stable and render it into
+the exact format a future model or trainer expects.
 
-- provide production-grade v1 ingestion for Claude Code, Codex, Pi, Oh My Pi (`omp`), OpenCode, and Cursor Agent CLI
-- redact and review traces before training or release
-- normalize provider-specific logs into `agent_trace_v1`
-- package canonical dataset shards for private training or optional publication
-- render canonical traces into Ornith/Qwen XML, OpenAI chat, Anthropic messages, ChatML, ShareGPT, and SFT text
+Discovery, normalization, validation, deterministic auditing, rendering, and
+dataset packaging run locally. There is no telemetry.
 
-## Current Status
+## Install
 
-Implemented:
+macOS or Linux:
 
-- inherited Pi collection/review/upload workflow
-- branch-aware native Pi and Oh My Pi JSONL adapters
-- branch-aware Claude Code JSONL with streamed assistant-part coalescing and unique subagent session IDs
-- Codex rollout JSONL with mirrored-user deduplication, reasoning, function/custom tool calls, web search, and tool output
-- native `cursor-agent` transcript adapter with stable synthesized call IDs and preserved `input` arguments
-- direct read-only, multi-session extraction from the OpenCode SQLite store
-- `aider` and `markdown-transcript` adapters for markdown-style CLI histories
-- native OpenCode session-export JSON with typed message parts, reasoning, files, tools, and tool results
-- native Continue session JSON with context items, thinking, tool states, and tool output
-- native Goose session-export JSON with typed conversation content, thinking, tool requests, and tool responses
-- backward-compatible OpenAI-shaped import for older OpenCode, Continue, and Goose exports
-- generic `openai-chat` and `anthropic-messages` adapters for harnesses that already export API-shaped message logs
-- `generic-json` fallback adapter for nested role/content exports such as `history`, `conversation`, `events`, or `transcript`
-- preservation of source tool schemas when API-shaped exports include them
-- `normalize --source auto` source detection
-- `sources` for machine-readable adapter support and auto-detection metadata
-- `discover` for finding local candidate traces from common coding-agent harnesses
-- `ingest` for normalizing mixed-source discovery manifests into one canonical shard
-- `normalize-dir` for combining a directory of trace JSONL files into one canonical JSONL shard
-- `validate` for canonical `agent_trace_v1` JSONL
-- `audit` for deterministic canonical release blockers, including known secrets, deny patterns, and common credential patterns
-- audit profiles for local, private, and public release policies
-- `approve` for explicit human approval artifacts tied to passing audit reports
-- `review-gate` for dataset-level manual or LLM review decisions before release
-- `render` for OpenAI chat, Anthropic messages, ChatML, ShareGPT, plain SFT text, and Ornith/Qwen XML training text
-- `enrich` for deterministic outcome signals such as commands, tests, build status, final diff availability, and user acceptance placeholders
-- `release` for packaging validated canonical shards with manifest metadata and a dataset card
-- GitHub Actions CI for check, test, and build
-- fixture regression test covering normalization, validation, batch normalization, rendering, auto-detection, and Codex assistant-turn coalescing
+```bash
+curl -fsSL https://raw.githubusercontent.com/selimozten/agent-trace-hub/main/install.sh | sh
+```
 
-Planned:
+Windows PowerShell:
 
-- additional harnesses after the v1 source contract is stable
-- direct extraction from the Goose local store
-- additional training-target renderers such as TRL preference pairs and DPO/ORPO pairs
+```powershell
+irm https://raw.githubusercontent.com/selimozten/agent-trace-hub/main/install.ps1 | iex
+```
 
-## Installation
+The installers detect the platform, download the latest standalone executable,
+and verify its SHA-256 checksum. The binary includes its runtime, dependencies,
+SQLite driver, and JSON schemas; Node.js and Bun are not required.
 
-Build and install a standalone executable from this checkout:
+Direct downloads and platform-specific instructions are available on the
+[download site](https://selimozten.github.io/agent-trace-hub/) and the
+[GitHub releases page](https://github.com/selimozten/agent-trace-hub/releases).
+
+To install a specific release or directory:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/selimozten/agent-trace-hub/main/install.sh | \
+  ATH_VERSION=0.1.0 ATH_INSTALL_DIR=/usr/local/bin sh
+```
+
+Build from source with Node.js 24 and Bun 1.3:
 
 ```bash
 npm ci
+npm run check
+npm test
 bun run install:local
-ath --version
 ```
 
-This installs `ath` and the `agent-trace-hub` alias into `~/.local/bin`. Override the destination when needed:
+## Supported Sources
+
+| Source | Native store | Coverage |
+| --- | --- | --- |
+| Claude Code | `~/.claude/projects/**/*.jsonl` | branches, streamed assistant parts, subagents, tools |
+| Codex | `~/.codex/sessions/**/*.jsonl` | reasoning, custom tools, web search, outputs |
+| Pi | `~/.pi/agent/sessions/**/*.jsonl` | active branch replay, reasoning, tools |
+| Oh My Pi | `~/.omp/agent/sessions/**/*.jsonl` | active branch replay, reasoning, tools |
+| OpenCode | `~/.local/share/opencode/opencode.db` | read-only multi-session SQLite extraction |
+| Cursor Agent CLI | `~/.cursor/projects/**/agent-transcripts/**/*.jsonl` | prompts, assistant text, tool requests |
+
+Extended importers support Continue, Goose, Aider, OpenAI-compatible chat,
+Anthropic Messages, generic nested JSON, and role-heading markdown. Run
+`ath sources --json` for the executable registry and support tiers.
+
+## First Dataset
 
 ```bash
-ATH_INSTALL_DIR=/usr/local/bin bun run install:local
+ath discover --root "$HOME" --output raw/discovered-traces.jsonl
+
+ath ingest \
+  --manifest raw/discovered-traces.jsonl \
+  --output canonical/shard-00001.agent_trace_v1.jsonl \
+  --error-output canonical/ingest-errors.jsonl \
+  --continue-on-error
+
+ath audit \
+  --input canonical/shard-00001.agent_trace_v1.jsonl \
+  --output canonical/shard-00001.audit.json \
+  --profile private
+
+ath render \
+  --format chatml \
+  --input canonical/shard-00001.agent_trace_v1.jsonl \
+  --output rendered/shard-00001.chatml.jsonl
 ```
 
-Bun is required only to build the executable. The installed 63 MiB binary contains the Bun runtime, application dependencies, SQLite driver, and JSON schemas; it does not require Bun, Node.js, or `node_modules` at runtime.
-
-Build without installing:
-
-```bash
-npm run build:binary
-./dist-bin/ath --version
-npm run test:binary
-```
-
-Tagged GitHub releases build archives for macOS ARM64/x64, Linux ARM64/x64, and Windows x64. Maintainers can build the same matrix locally with `npm run build:binaries` or one target with:
-
-```bash
-bun scripts/build-binary.mjs --target bun-linux-x64-baseline
-```
-
-The `collect` and `review` workflows can still require external tools such as Pi and TruffleHog. Trace discovery, normalization, validation, rendering, auditing, and release packaging are self-contained.
+Treat discovered manifests and trace shards as sensitive data. Inspect and
+approve them under your own policy before training, sharing, or publishing.
 
 ## Usage
 
@@ -351,8 +364,25 @@ npm run build
 - batch `normalize-dir`
 - Codex response-item coalescing plus custom-tool preservation
 
-## Private Use
+## Data Ownership
 
-This repository is set up for private/internal trace collection and model training first. Keep raw traces, canonical shards, audit reports, approvals, and rendered training data private by default.
+Keep raw traces, canonical shards, audit reports, approvals, and rendered
+training data private by default. This tool does not grant rights to source
+code, prompts, model output, or other material contained in a trace. Dataset
+licensing and consent remain the operator's responsibility.
 
-If you later decide to publish the tool or a dataset externally, do a separate redistribution review and choose explicit project and dataset licenses at that point.
+## Community
+
+- [Contributing guide](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+- [Support](SUPPORT.md)
+- [Roadmap](ROADMAP.md)
+- [Changelog](CHANGELOG.md)
+
+## Attribution And License Status
+
+Agent Trace Hub began as an extension of
+[badlogic/pi-share-hf](https://github.com/badlogic/pi-share-hf). See
+[NOTICE.md](NOTICE.md) for attribution and current licensing status. The
+upstream project does not declare a software license, so this repository does
+not currently claim a blanket open-source license for inherited portions.

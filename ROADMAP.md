@@ -18,7 +18,7 @@ The target is a production-ready trace pipeline that can ingest major coding-age
 | Render training targets | yes | Renders multiple model-family formats from canonical data. |
 | Enrich outcomes | yes | `enrich` derives command, test, build, final-diff availability, and user-acceptance signals from canonical traces. |
 | Review/redact before release | partial | Strong inherited Pi workflow plus deterministic canonical audit, human approval, and dataset-level review gate; running external LLM review remains an integration concern. |
-| Standalone distribution | yes | Bun produces a dependency-free executable; CI verifies it and tagged releases build five platform targets. |
+| Standalone distribution | yes | Bun produces a dependency-free executable; CI verifies it, tagged releases build five platform targets, and checksum-verifying installers plus a Pages site expose stable downloads. |
 
 ## Current Support
 
@@ -83,4 +83,5 @@ The first six rows are the supported v1 contract. Remaining rows are extended im
 - Add source-local parser modules before expanding beyond the v1 harness set.
 - Validate discovery candidates against adapter detection before assigning high confidence.
 - Add preference-pair renderers when quality labels or rejected alternatives are available.
-- Before any external publication, choose explicit project and dataset licenses and run a redistribution review.
+- Resolve the inherited `pi-share-hf` licensing terms or replace inherited code before claiming a project-wide open-source license.
+- Keep tool licensing separate from dataset consent, provenance, and redistribution policy.

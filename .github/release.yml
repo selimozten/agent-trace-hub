@@ -1,0 +1,17 @@
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+  categories:
+    - title: Source adapters
+      labels:
+        - adapter
+    - title: Training formats
+      labels:
+        - renderer
+    - title: Security and privacy
+      labels:
+        - security
+    - title: Other changes
+      labels:
+        - "*"

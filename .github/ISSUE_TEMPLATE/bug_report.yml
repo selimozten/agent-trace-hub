@@ -1,0 +1,64 @@
+name: Bug report
+description: Report reproducible incorrect behavior
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not attach private traces or credentials. Use a synthetic or fully redacted sample.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `ath --version`.
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: Platform
+      placeholder: macOS 15 arm64
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Source adapter
+      options:
+        - claude-code
+        - codex
+        - pi
+        - omp
+        - opencode
+        - cursor-agent
+        - extended or fallback adapter
+        - not source-specific
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Provide exact commands and a minimal synthetic input when possible.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Data safety
+      options:
+        - label: I removed credentials, private traces, personal paths, and proprietary source code.
+          required: true

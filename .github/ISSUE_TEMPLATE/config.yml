@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions and ideas
+    url: https://github.com/selimozten/agent-trace-hub/discussions
+    about: Ask for help or discuss broader trace and training workflows.
+  - name: Security report
+    url: https://github.com/selimozten/agent-trace-hub/security/advisories/new
+    about: Report vulnerabilities privately.

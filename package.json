@@ -1,6 +1,24 @@
 {
   "name": "agent-trace-hub",
   "version": "0.1.0",
+  "description": "Collect, normalize, audit, and render coding-agent traces in one portable format.",
+  "author": "selimozten",
+  "homepage": "https://selimozten.github.io/agent-trace-hub/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/selimozten/agent-trace-hub.git"
+  },
+  "bugs": {
+    "url": "https://github.com/selimozten/agent-trace-hub/issues"
+  },
+  "keywords": [
+    "agent-traces",
+    "coding-agents",
+    "datasets",
+    "fine-tuning",
+    "llm",
+    "sft"
+  ],
   "type": "module",
   "engines": {
     "node": ">=22.6.0"
@@ -12,15 +30,19 @@
   "files": [
     "dist/**/*",
     "schema/**/*",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md",
+    "NOTICE.md"
   ],
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && node scripts/fix-shebang.mjs && chmod +x dist/index.js",
     "build:binary": "bun scripts/build-binary.mjs",
     "build:binaries": "bun scripts/build-binary.mjs --all",
+    "package:release": "node scripts/package-release.mjs",
     "check": "tsgo --noEmit && node --experimental-strip-types src/index.ts --help >/dev/null && node --experimental-strip-types src/index.ts init --help >/dev/null && node --experimental-strip-types src/index.ts collect --help >/dev/null && node --experimental-strip-types src/index.ts review --help >/dev/null && node --experimental-strip-types src/index.ts upload --help >/dev/null && node --experimental-strip-types src/index.ts reject --help >/dev/null && node --experimental-strip-types src/index.ts list --help >/dev/null && node --experimental-strip-types src/index.ts grep --help >/dev/null && node --experimental-strip-types src/index.ts sources --help >/dev/null && node --experimental-strip-types src/index.ts discover --help >/dev/null && node --experimental-strip-types src/index.ts ingest --help >/dev/null && node --experimental-strip-types src/index.ts normalize --help >/dev/null && node --experimental-strip-types src/index.ts normalize-dir --help >/dev/null && node --experimental-strip-types src/index.ts validate --help >/dev/null && node --experimental-strip-types src/index.ts validate-artifact --help >/dev/null && node --experimental-strip-types src/index.ts audit --help >/dev/null && node --experimental-strip-types src/index.ts approve --help >/dev/null && node --experimental-strip-types src/index.ts review-gate --help >/dev/null && node --experimental-strip-types src/index.ts render --help >/dev/null && node --experimental-strip-types src/index.ts enrich --help >/dev/null && node --experimental-strip-types src/index.ts release --help >/dev/null",
     "test": "node scripts/verify-fixtures.mjs",
     "test:binary": "bun scripts/verify-binary.mjs",
+    "test:public": "node scripts/verify-public-assets.mjs",
     "install:local": "bun scripts/install-local.mjs"
   },
   "dependencies": {
