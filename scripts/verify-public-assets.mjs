@@ -34,7 +34,9 @@ assert.ok(releasePackager.includes('`agent-trace-hub-${platform}.zip`'));
 assert.ok(siteHtml.includes("Agent Trace Hub"));
 assert.ok(siteHtml.includes("id=\"download\""));
 assert.ok(!siteHtml.includes('href="#"'));
-assert.ok(pagesWorkflow.includes("actions/deploy-pages@v4"));
+assert.ok(pagesWorkflow.includes("actions/configure-pages@v6"));
+assert.ok(pagesWorkflow.includes("actions/upload-pages-artifact@v5"));
+assert.ok(pagesWorkflow.includes("actions/deploy-pages@v5"));
 assert.ok(read("README.md").includes("curl -fsSL https://raw.githubusercontent.com/selimozten/agent-trace-hub/main/install.sh | sh"));
 assert.ok(read("CHANGELOG.md").includes("## [0.1.0]"));
 
