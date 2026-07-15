@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <img src="site/assets/social-card.png" width="820" alt="Agent Trace Hub canonical trace pipeline" />
+  <img src="site/assets/social-card.png" width="820" alt="Agent Trace Hub ASCII orb and local source scanner" />
 </p>
 
 Agent Trace Hub reads native local stores from Claude Code, Codex, Pi, Oh My

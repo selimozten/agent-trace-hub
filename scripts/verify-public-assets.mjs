@@ -14,7 +14,15 @@ const expectedAssets = [
 ];
 const expectedSiteAssets = [
   "site/assets/social-card.png",
-  "site/assets/trace-map.png",
+  "site/assets/agent-trace-orb.png",
+  "site/assets/agent-trace-orb.txt",
+  "site/assets/agents/SOURCES.md",
+  "site/assets/agents/claude-code.svg",
+  "site/assets/agents/codex.png",
+  "site/assets/agents/pi.svg",
+  "site/assets/agents/opencode.svg",
+  "site/assets/agents/omp.svg",
+  "site/assets/agents/cursor-agent.svg",
 ];
 
 const shellCheck = spawnSync("sh", ["-n", path.join(root, "install.sh")], { encoding: "utf8" });
@@ -40,7 +48,11 @@ assert.ok(powershellInstaller.includes("agent-trace-hub-windows-x64.zip"));
 assert.ok(releasePackager.includes('`agent-trace-hub-${platform}.tar.gz`'));
 assert.ok(releasePackager.includes('`agent-trace-hub-${platform}.zip`'));
 assert.ok(siteHtml.includes("Agent Trace Hub"));
-assert.ok(siteHtml.includes("assets/trace-map.png"));
+assert.ok(siteHtml.includes("assets/agent-trace-orb.png"));
+assert.ok(siteScript.includes("assets/agent-trace-orb.txt"));
+for (const asset of ["claude-code.svg", "codex.png", "pi.svg", "opencode.svg", "omp.svg", "cursor-agent.svg"]) {
+  assert.ok(siteHtml.includes(`assets/agents/${asset}`), `site is missing the ${asset} mark`);
+}
 assert.ok(siteHtml.includes("id=\"download\""));
 assert.ok(!siteHtml.includes('href="#"'));
 assert.ok(pagesWorkflow.includes("actions/configure-pages@v6"));
