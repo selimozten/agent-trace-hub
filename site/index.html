@@ -26,8 +26,15 @@
     <link rel="canonical" href="https://selimozten.github.io/agent-trace-hub/" />
     <title>Agent Trace Hub</title>
     <link rel="icon" href="assets/agent-trace-orb.png" type="image/png" />
-    <link rel="stylesheet" href="styles.css?v=0.1.0" />
-    <script src="app.js?v=0.1.0" defer></script>
+    <link
+      rel="preload"
+      href="assets/fonts/bricolage-grotesque-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link rel="stylesheet" href="styles.css?v=0.1.1" />
+    <script src="app.js?v=0.1.1" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -35,7 +42,7 @@
     <nav class="site-nav" aria-label="Primary navigation">
       <a class="wordmark" href="#top" aria-label="Agent Trace Hub home">
         <span class="wordmark-orb" aria-hidden="true">
-          <img src="assets/agent-trace-orb.png" alt="" />
+          <img src="assets/agent-trace-orb-hero.png" alt="" />
         </span>
         <span>Agent Trace Hub</span>
       </a>
@@ -57,10 +64,10 @@
         <div class="ascii-stage" aria-hidden="true">
           <img
             class="ascii-fallback"
-            src="assets/agent-trace-orb.png"
+            src="assets/agent-trace-orb-hero.png"
             alt=""
-            width="742"
-            height="760"
+            width="1460"
+            height="1334"
             fetchpriority="high"
           />
           <canvas id="ascii-orb"></canvas>
@@ -351,7 +358,7 @@
     <footer class="site-footer">
       <div class="section-shell footer-main">
         <div class="footer-brand">
-          <img src="assets/agent-trace-orb.png" alt="" />
+          <img src="assets/agent-trace-orb-hero.png" alt="" />
           <strong>Agent Trace Hub</strong>
           <span data-version>v0.1.0</span>
         </div>

@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "Bricolage Grotesque";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("assets/fonts/bricolage-grotesque-latin.woff2") format("woff2");
+}
+
 :root {
   color-scheme: light;
   --ink: #080908;
@@ -13,12 +21,18 @@
   --focus: #ff6542;
   --mono: "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
   --sans: "Avenir Next", Avenir, "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --display: "Bricolage Grotesque", "Avenir Next", "Helvetica Neue", sans-serif;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --shell: 1280px;
 }
 
 * {
   box-sizing: border-box;
+}
+
+::selection {
+  background: var(--signal);
+  color: #000000;
 }
 
 html {
@@ -135,11 +149,9 @@ pre {
 }
 
 .wordmark-orb img {
-  position: absolute;
-  width: 39px;
-  height: 40px;
-  max-width: none;
-  transform: translate(-5px, -5px);
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .nav-links {
@@ -189,6 +201,7 @@ pre {
   z-index: 0;
   inset: 0;
   overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 0%, #000 72%, transparent 97%);
 }
 
 .ascii-stage canvas {
@@ -226,13 +239,51 @@ pre {
   width: min(620px, 44%);
 }
 
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.js .hero h1,
+.js .hero-copy p {
+  animation: rise-in 640ms var(--ease-out) backwards;
+}
+
+.js .hero-copy p {
+  animation-delay: 110ms;
+}
+
+.js .source-console {
+  animation: console-rise 640ms var(--ease-out) 220ms backwards;
+}
+
+@keyframes console-rise {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
 .hero h1 {
   max-width: 620px;
   margin: 0;
+  font-family: var(--display);
   font-size: 96px;
-  font-weight: 690;
+  font-weight: 780;
   line-height: 0.92;
-  letter-spacing: 0;
+  letter-spacing: -0.025em;
 }
 
 .hero-copy p {
@@ -423,8 +474,9 @@ pre {
 .local-section h2,
 .download-heading h2 {
   margin: 0;
-  font-weight: 690;
-  letter-spacing: 0;
+  font-family: var(--display);
+  font-weight: 760;
+  letter-spacing: -0.02em;
 }
 
 .sources-heading h2 {
@@ -654,9 +706,11 @@ pre {
 
 .preservation-wrap h3 {
   margin: 0 0 40px;
+  font-family: var(--display);
   font-size: 43px;
+  font-weight: 720;
   line-height: 1.05;
-  letter-spacing: 0;
+  letter-spacing: -0.015em;
 }
 
 .preservation-table {
@@ -945,6 +999,7 @@ pre {
 .footer-brand img {
   width: 36px;
   height: 36px;
+  object-fit: contain;
   grid-row: 1 / span 2;
 }
 

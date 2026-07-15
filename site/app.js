@@ -301,11 +301,24 @@ async function initializeAsciiOrb() {
   const maxColumns = Math.max(...lines.map((line) => line.length));
   const particles = [];
   const pointer = { x: 0, y: 0, lastX: 0, lastY: 0, active: false };
+  // The orb is shaded by glyph density: "#" is the background field, "@" the core.
+  const glyphAlpha = {
+    "#": 0.1,
+    "@": 1,
+    "%": 0.85,
+    "=": 0.7,
+    "*": 0.6,
+    "+": 0.48,
+    "-": 0.36,
+    ":": 0.27,
+    ".": 0.2,
+  };
   let width = 0;
   let height = 0;
   let dpr = 1;
   let fontSize = 12;
   let animationFrame = 0;
+  let materialized = false;
 
   function layout() {
     const bounds = hero.getBoundingClientRect();
@@ -321,12 +334,19 @@ async function initializeAsciiOrb() {
     const mobile = width <= 760;
     const shortMobile = mobile && height <= 650;
     const shortLandscape = width >= 560 && height <= 520;
-    const artWidth = shortLandscape
+    const targetWidth = shortLandscape
       ? Math.min(300, width * 0.36)
       : mobile
         ? Math.min(width - 44, shortMobile ? 185 : 280)
         : Math.min(width * 0.54, 730);
-    fontSize = artWidth / (maxColumns * 0.602);
+
+    // Measure the real glyph advance so the art keeps its intended width on
+    // machines without SF Mono instead of overflowing the hero.
+    context.font = '100px "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace';
+    const advanceRatio = context.measureText("M").width / 100;
+    fontSize = targetWidth / (maxColumns * advanceRatio);
+    const characterWidth = fontSize * advanceRatio;
+    const artWidth = maxColumns * characterWidth;
     const lineHeight = fontSize * 1.08;
     const artHeight = lines.length * lineHeight;
     const originX = shortLandscape
@@ -340,9 +360,8 @@ async function initializeAsciiOrb() {
         ? (shortMobile ? 62 : 54)
         : Math.max(62, Math.min(104, (height - artHeight) * 0.16));
 
-    context.font = `${fontSize}px "SFMono-Regular", Consolas, "Liberation Mono", monospace`;
+    context.font = `${fontSize}px "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace`;
     context.textBaseline = "top";
-    const characterWidth = context.measureText("M").width;
     particles.length = 0;
 
     lines.forEach((line, row) => {
@@ -350,12 +369,45 @@ async function initializeAsciiOrb() {
         if (character === " ") return;
         const homeX = originX + column * characterWidth;
         const homeY = originY + row * lineHeight;
-        particles.push({ character, homeX, homeY, x: homeX, y: homeY, vx: 0, vy: 0, energy: 0 });
+        particles.push({
+          character,
+          alpha: glyphAlpha[character] ?? 0.5,
+          homeX,
+          homeY,
+          x: homeX,
+          y: homeY,
+          vx: 0,
+          vy: 0,
+          energy: 0,
+        });
       });
     });
 
+    if (!materialized) {
+      materialized = true;
+      scatterParticles();
+      stage.dataset.ready = "true";
+      wake();
+      return;
+    }
+
     draw();
     stage.dataset.ready = "true";
+  }
+
+  // First paint: the trace characters fly in from a loose cloud and settle
+  // into the orb, glowing briefly while they still carry energy.
+  function scatterParticles() {
+    const spread = Math.max(width, height) * 0.22;
+    for (const particle of particles) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = spread * (0.3 + Math.random() * 0.7);
+      particle.x = particle.homeX + Math.cos(angle) * distance;
+      particle.y = particle.homeY + Math.sin(angle) * distance;
+      particle.vx = 0;
+      particle.vy = 0;
+      particle.energy = 0.35 + Math.random() * 0.45;
+    }
   }
 
   function disturb(event) {
@@ -428,14 +480,15 @@ async function initializeAsciiOrb() {
 
   function draw() {
     context.clearRect(0, 0, width, height);
-    context.font = `${fontSize}px "SFMono-Regular", Consolas, "Liberation Mono", monospace`;
+    context.font = `${fontSize}px "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace`;
     context.textBaseline = "top";
     for (const particle of particles) {
       const energy = Math.min(1, particle.energy);
       const red = Math.round(243 + 12 * energy);
       const green = Math.round(247 - 146 * energy);
       const blue = Math.round(239 - 173 * energy);
-      context.fillStyle = `rgb(${red} ${green} ${blue})`;
+      const alpha = particle.alpha + (1 - particle.alpha) * energy;
+      context.fillStyle = `rgb(${red} ${green} ${blue} / ${alpha.toFixed(3)})`;
       context.fillText(particle.character, particle.x, particle.y);
     }
   }
