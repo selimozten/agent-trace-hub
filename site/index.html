@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#000000" />
+    <meta name="theme-color" content="#050604" />
     <meta
       name="description"
       content="Collect coding-agent traces once, preserve their structure, and render training data for any model next."
@@ -21,11 +21,25 @@
     />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Agent Trace Hub interactive ASCII orb and local source scanner" />
+    <meta property="og:image:alt" content="Agent Trace Hub — one local trace contract for every coding agent" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="canonical" href="https://selimozten.github.io/agent-trace-hub/" />
     <title>Agent Trace Hub</title>
     <link rel="icon" href="assets/agent-trace-orb.png" type="image/png" />
+    <link
+      rel="preload"
+      href="assets/fonts/instrument-serif-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
+    <link
+      rel="preload"
+      href="assets/fonts/instrument-serif-italic-latin.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+    />
     <link
       rel="preload"
       href="assets/fonts/bricolage-grotesque-latin.woff2"
@@ -33,215 +47,72 @@
       type="font/woff2"
       crossorigin
     />
-    <link rel="stylesheet" href="styles.css?v=0.1.1" />
-    <script src="app.js?v=0.1.1" defer></script>
+    <link rel="stylesheet" href="styles.css?v=0.2.0" />
+    <script src="app.js?v=0.2.0" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
 
-    <nav class="site-nav" aria-label="Primary navigation">
-      <a class="wordmark" href="#top" aria-label="Agent Trace Hub home">
-        <span class="wordmark-orb" aria-hidden="true">
-          <img src="assets/agent-trace-orb-hero.png" alt="" />
-        </span>
-        <span>Agent Trace Hub</span>
-      </a>
-      <div class="nav-links">
-        <a href="#sources">Sources</a>
-        <a href="#contract">Contract</a>
-        <a href="#download">Install</a>
-        <a href="https://github.com/selimozten/agent-trace-hub">GitHub</a>
-      </div>
-      <a class="nav-install" href="#download" aria-label="Download Agent Trace Hub" title="Download">
-        <svg class="icon" aria-hidden="true" viewBox="0 0 24 24">
-          <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />
-        </svg>
-      </a>
-    </nav>
-
     <main id="main">
-      <section class="hero" id="top" aria-labelledby="hero-title">
-        <div class="ascii-stage" aria-hidden="true">
-          <img
-            class="ascii-fallback"
-            src="assets/agent-trace-orb-hero.png"
-            alt=""
-            width="1460"
-            height="1334"
-            fetchpriority="high"
-          />
-          <canvas id="ascii-orb"></canvas>
-        </div>
+      <section class="panel hero" aria-labelledby="hero-title">
+        <canvas id="ascii-scene" aria-hidden="true"></canvas>
 
-        <div class="hero-copy">
-          <h1 id="hero-title">Agent Trace Hub</h1>
-          <p>Keep the evidence your coding agents leave behind.</p>
-        </div>
-
-        <div class="source-console" aria-label="Native source scanner">
-          <div class="source-tabs" role="tablist" aria-label="Coding-agent source">
-            <button id="source-tab-claude-code" type="button" role="tab" aria-selected="false" aria-controls="source-readout" data-source-agent="claude-code" tabindex="-1">
-              <img src="assets/agents/claude-code.svg" alt="" />
-              <span>Claude Code</span>
-            </button>
-            <button id="source-tab-codex" type="button" role="tab" aria-selected="true" aria-controls="source-readout" data-source-agent="codex" tabindex="0">
-              <img src="assets/agents/codex.png" alt="" />
-              <span>Codex</span>
-            </button>
-            <button id="source-tab-pi" type="button" role="tab" aria-selected="false" aria-controls="source-readout" data-source-agent="pi" tabindex="-1">
-              <img src="assets/agents/pi.svg" alt="" />
-              <span>Pi</span>
-            </button>
-            <button id="source-tab-opencode" type="button" role="tab" aria-selected="false" aria-controls="source-readout" data-source-agent="opencode" tabindex="-1">
-              <img src="assets/agents/opencode.svg" alt="" />
-              <span>OpenCode</span>
-            </button>
-            <button id="source-tab-omp" type="button" role="tab" aria-selected="false" aria-controls="source-readout" data-source-agent="omp" tabindex="-1">
-              <img src="assets/agents/omp.svg" alt="" />
-              <span>OMP</span>
-            </button>
-            <button id="source-tab-cursor-agent" type="button" role="tab" aria-selected="false" aria-controls="source-readout" data-source-agent="cursor-agent" tabindex="-1">
-              <img src="assets/agents/cursor-agent.svg" alt="" />
-              <span>Cursor Agent</span>
-            </button>
+        <nav class="hero-nav" aria-label="Primary navigation">
+          <a class="wordmark" href="#main" aria-label="Agent Trace Hub home">
+            <img src="assets/agent-trace-orb-hero.png" alt="" />
+            <span>Agent Trace Hub</span>
+          </a>
+          <div class="nav-links">
+            <span class="nav-note">local only · 0 telemetry</span>
+            <a href="https://github.com/selimozten/agent-trace-hub">GitHub</a>
           </div>
+        </nav>
 
-          <div class="source-readout" id="source-readout" role="tabpanel" aria-labelledby="source-tab-codex">
-            <span class="source-readout-name" id="hero-source-name">Codex</span>
-            <code id="hero-source-path">~/.codex/sessions</code>
-            <span class="source-readout-state">native reader</span>
-          </div>
-
-          <div class="scan-command">
-            <span class="prompt" aria-hidden="true">$</span>
-            <code id="hero-command">ath discover --root "$HOME"</code>
-            <button class="icon-button copy-control" type="button" data-copy-target="hero-command" aria-label="Copy discovery command" title="Copy">
-              <svg class="icon copy-icon" aria-hidden="true" viewBox="0 0 24 24">
-                <rect width="13" height="13" x="8" y="8" rx="2" />
-                <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
-              </svg>
-              <svg class="icon check-icon" aria-hidden="true" viewBox="0 0 24 24">
-                <path d="m5 12 4 4L19 6" />
-              </svg>
-            </button>
-          </div>
-
-          <div class="console-meta">
-            <span>6 native readers</span>
-            <span>local only</span>
-            <span>0 telemetry</span>
-            <a href="#download">Get the binary</a>
-          </div>
-        </div>
-      </section>
-
-      <section class="sources-section" id="sources" aria-labelledby="sources-title">
-        <div class="section-shell sources-heading">
-          <h2 id="sources-title">Six agents in.<br />One durable trace out.</h2>
-          <p>
-            Agent Trace Hub reads the files and databases the tools already own.
-            No exporter plugins, no copied chat transcripts, no flattened tool calls.
+        <div class="hero-center">
+          <h1 id="hero-title">Keep the <em>evidence.</em></h1>
+          <p class="hero-sub">
+            Every coding agent leaves traces behind. <code>ath</code> collects them
+            once — and renders training data for any model next.
           </p>
-        </div>
 
-        <ol class="source-ledger section-shell">
-          <li>
-            <span class="source-number">01</span>
-            <img src="assets/agents/claude-code.svg" alt="" />
-            <strong>Claude Code</strong>
-            <code>~/.claude/projects</code>
-            <span>JSONL sessions</span>
-          </li>
-          <li>
-            <span class="source-number">02</span>
-            <img src="assets/agents/codex.png" alt="" />
-            <strong>Codex</strong>
-            <code>~/.codex/sessions</code>
-            <span>JSONL sessions</span>
-          </li>
-          <li>
-            <span class="source-number">03</span>
-            <img src="assets/agents/pi.svg" alt="" />
-            <strong>Pi</strong>
-            <code>~/.pi/agent/sessions</code>
-            <span>Branching JSONL</span>
-          </li>
-          <li>
-            <span class="source-number">04</span>
-            <img src="assets/agents/opencode.svg" alt="" />
-            <strong>OpenCode</strong>
-            <code>~/.local/share/opencode</code>
-            <span>SQLite parts</span>
-          </li>
-          <li>
-            <span class="source-number">05</span>
-            <img src="assets/agents/omp.svg" alt="" />
-            <strong>Oh My Pi</strong>
-            <code>~/.omp/agent/sessions</code>
-            <span>Branching JSONL</span>
-          </li>
-          <li>
-            <span class="source-number">06</span>
-            <img src="assets/agents/cursor-agent.svg" alt="" />
-            <strong>Cursor Agent CLI</strong>
-            <code>~/.cursor/projects</code>
-            <span>Agent transcripts</span>
-          </li>
-        </ol>
-      </section>
-
-      <section class="contract-section" id="contract" aria-labelledby="contract-title">
-        <div class="section-shell contract-heading">
-          <p class="section-index">The canonical layer / 01</p>
-          <h2 id="contract-title">Preserve first.<br />Render later.</h2>
-          <p>
-            Source detail enters <code>agent_trace_v1</code>. Provider syntax appears
-            only at the final training render.
-          </p>
-        </div>
-
-        <div class="contract-tool section-shell">
-          <div class="contract-controls">
-            <label>
-              <span>Native source</span>
-              <select id="source-select">
-                <option value="claude-code">Claude Code</option>
-                <option value="codex" selected>Codex</option>
-                <option value="pi">Pi</option>
-                <option value="opencode">OpenCode</option>
-                <option value="omp">Oh My Pi</option>
-                <option value="cursor-agent">Cursor Agent CLI</option>
-              </select>
-            </label>
-            <div class="contract-route" aria-label="Canonical trace contract">
-              <span id="route-source">Codex</span>
-              <svg class="route-arrow" aria-hidden="true" viewBox="0 0 48 16">
-                <path d="M0 8h46m-6-6 6 6-6 6" />
-              </svg>
-              <strong>agent_trace_v1</strong>
-              <svg class="route-arrow" aria-hidden="true" viewBox="0 0 48 16">
-                <path d="M0 8h46m-6-6 6 6-6 6" />
-              </svg>
-              <span id="route-target">ChatML</span>
+          <div class="console">
+            <div class="source-tabs" role="tablist" aria-label="Coding-agent source">
+              <button id="tab-claude-code" type="button" role="tab" aria-selected="false" aria-controls="source-readout" data-source-agent="claude-code" tabindex="-1">
+                <img src="assets/agents/claude-code.svg" alt="" />
+                <span>Claude&nbsp;Code</span>
+              </button>
+              <button id="tab-codex" type="button" role="tab" aria-selected="true" aria-controls="source-readout" data-source-agent="codex" tabindex="0">
+                <img src="assets/agents/codex.png" alt="" />
+                <span>Codex</span>
+              </button>
+              <button id="tab-pi" type="button" role="tab" aria-selected="false" aria-controls="source-readout" data-source-agent="pi" tabindex="-1">
+                <img src="assets/agents/pi.svg" alt="" />
+                <span>Pi</span>
+              </button>
+              <button id="tab-opencode" type="button" role="tab" aria-selected="false" aria-controls="source-readout" data-source-agent="opencode" tabindex="-1">
+                <img src="assets/agents/opencode.svg" alt="" />
+                <span>OpenCode</span>
+              </button>
+              <button id="tab-omp" type="button" role="tab" aria-selected="false" aria-controls="source-readout" data-source-agent="omp" tabindex="-1">
+                <img src="assets/agents/omp.svg" alt="" />
+                <span>OMP</span>
+              </button>
+              <button id="tab-cursor-agent" type="button" role="tab" aria-selected="false" aria-controls="source-readout" data-source-agent="cursor-agent" tabindex="-1">
+                <img src="assets/agents/cursor-agent.svg" alt="" />
+                <span>Cursor</span>
+              </button>
             </div>
-            <label>
-              <span>Training target</span>
-              <select id="format-select">
-                <option value="openai-chat">OpenAI chat</option>
-                <option value="anthropic-messages">Anthropic Messages</option>
-                <option value="chatml" selected>ChatML</option>
-                <option value="sharegpt">ShareGPT</option>
-                <option value="sft-text">Plain SFT text</option>
-                <option value="ornith-qwen-xml">Ornith / Qwen XML</option>
-              </select>
-            </label>
-          </div>
 
-          <div class="trace-artifact">
-            <div class="artifact-meta">
-              <span id="artifact-location">~/.codex/sessions</span>
-              <span>canonical/session.agent_trace_v1.jsonl</span>
-              <button class="icon-button copy-control" type="button" data-copy-target="trace-output" aria-label="Copy canonical trace example" title="Copy">
+            <div class="source-readout" id="source-readout" role="tabpanel" aria-labelledby="tab-codex">
+              <span>reads</span>
+              <code id="source-path">~/.codex/sessions</code>
+              <span id="source-kind">JSONL sessions</span>
+            </div>
+
+            <div class="cmd">
+              <span class="prompt" aria-hidden="true">$</span>
+              <code id="install-command">curl -fsSL https://raw.githubusercontent.com/selimozten/agent-trace-hub/main/install.sh | sh</code>
+              <button class="copy-control" type="button" data-copy-target="install-command" aria-label="Copy install command" title="Copy">
                 <svg class="icon copy-icon" aria-hidden="true" viewBox="0 0 24 24">
                   <rect width="13" height="13" x="8" y="8" rx="2" />
                   <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
@@ -251,127 +122,47 @@
                 </svg>
               </button>
             </div>
-            <pre id="trace-output" tabindex="0"><code>{
-  <span class="json-key">"schema"</span>: <span class="json-string">"agent_trace_v1"</span>,
-  <span class="json-key">"source"</span>: { <span class="json-key">"agent"</span>: <span class="json-string">"codex"</span> },
-  <span class="json-key">"messages"</span>: [{
-    <span class="json-key">"role"</span>: <span class="json-string">"assistant"</span>,
-    <span class="json-key">"reasoning"</span>: [<span class="json-string">"Inspect the failing test first."</span>],
-    <span class="json-key">"tool_calls"</span>: [{ <span class="json-key">"name"</span>: <span class="json-string">"exec_command"</span> }]
-  }],
-  <span class="json-key">"outcome"</span>: { <span class="json-key">"quality"</span>: <span class="json-string">"unlabeled"</span> }
-}</code></pre>
-          </div>
-        </div>
 
-        <div class="preservation-wrap section-shell">
-          <h3>Nothing useful gets flattened.</h3>
-          <div class="preservation-table" role="region" aria-label="Trace preservation matrix" tabindex="0">
-            <table>
-              <thead>
-                <tr><th>Signal</th><th>Native ingest</th><th>Canonical</th><th>Training render</th></tr>
-              </thead>
-              <tbody>
-                <tr><th>Reasoning blocks</th><td>Preserved</td><td>Typed content</td><td>Mapped</td></tr>
-                <tr><th>Tool schemas</th><td>Preserved</td><td>Structured JSON</td><td>Provider syntax</td></tr>
-                <tr><th>Tool results</th><td>Ordered</td><td>Call-linked</td><td>Provider syntax</td></tr>
-                <tr><th>Session branches</th><td>Replayed</td><td>Active path</td><td>Clean sequence</td></tr>
-                <tr><th>Source metadata</th><td>Captured</td><td>Namespaced</td><td>Attached</td></tr>
-                <tr><th>Outcome signals</th><td>Derived</td><td>Auditable</td><td>Trainer-ready</td></tr>
-              </tbody>
-            </table>
+            <p class="or-line" aria-hidden="true">⌃ or grab the binary</p>
+
+            <div class="actions">
+              <a class="button primary" id="recommended-download" href="https://github.com/selimozten/agent-trace-hub/releases/latest/download/agent-trace-hub-darwin-arm64.tar.gz">
+                <svg class="icon" aria-hidden="true" viewBox="0 0 24 24">
+                  <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />
+                </svg>
+                <span id="recommended-label">Download · macOS ARM64</span>
+              </a>
+              <a class="button ghost" href="https://github.com/selimozten/agent-trace-hub/releases/latest">
+                All downloads
+              </a>
+            </div>
           </div>
+
+          <p class="hero-meta">
+            6 native readers · renders OpenAI, Anthropic, ChatML, ShareGPT, SFT
+            &amp; Qwen&nbsp;XML · nothing leaves your machine
+          </p>
         </div>
       </section>
 
-      <section class="local-section" id="security" aria-labelledby="security-title">
-        <div class="section-shell local-layout">
-          <div>
-            <p class="section-index">Local by default / 02</p>
-            <h2 id="security-title"><span>0</span> trace uploads.</h2>
-          </div>
-          <div class="local-copy">
-            <p>
-              Discovery, normalization, validation, audit, and rendering run on
-              your machine. There is no hosted account and no telemetry endpoint.
-            </p>
-            <a href="https://github.com/selimozten/agent-trace-hub/blob/main/SECURITY.md">Read the security policy</a>
-          </div>
+      <footer class="panel site-footer">
+        <div class="footer-top">
+          <span class="footer-stat"><span class="prompt">$</span> ath <span data-version>v0.1.0</span></span>
+          <span class="footer-stat">no accounts. no uploads. your traces stay on disk.</span>
         </div>
-        <div class="audit-line section-shell" aria-label="Example audit result">
-          <code><span>$</span> ath audit --input canonical/share.jsonl --profile public</code>
-          <dl>
-            <div><dt>findings</dt><dd>0</dd></div>
-            <div><dt>blocking</dt><dd>0</dd></div>
-            <div><dt>status</dt><dd>pass</dd></div>
-          </dl>
-        </div>
-      </section>
-
-      <section class="download-section" id="download" aria-labelledby="download-title">
-        <div class="section-shell download-heading">
-          <p class="section-index">Standalone executable / 03</p>
-          <h2 id="download-title">Put <code>ath</code><br />on the path.</h2>
-          <p>No Node.js, Bun, or <code>node_modules</code> after installation.</p>
-        </div>
-
-        <div class="installer section-shell">
-          <div class="platform-switch" role="group" aria-label="Operating system">
-            <button type="button" data-install-platform="macos" aria-pressed="true">macOS</button>
-            <button type="button" data-install-platform="linux" aria-pressed="false">Linux</button>
-            <button type="button" data-install-platform="windows" aria-pressed="false">Windows</button>
-          </div>
-          <div class="installer-command">
-            <span class="prompt" aria-hidden="true">$</span>
-            <code id="install-command">curl -fsSL https://raw.githubusercontent.com/selimozten/agent-trace-hub/main/install.sh | sh</code>
-            <button class="icon-button copy-control" type="button" data-copy-target="install-command" aria-label="Copy install command" title="Copy">
-              <svg class="icon copy-icon" aria-hidden="true" viewBox="0 0 24 24">
-                <rect width="13" height="13" x="8" y="8" rx="2" />
-                <path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" />
-              </svg>
-              <svg class="icon check-icon" aria-hidden="true" viewBox="0 0 24 24">
-                <path d="m5 12 4 4L19 6" />
-              </svg>
-            </button>
-          </div>
-
-          <a class="recommended-download" id="recommended-download" href="https://github.com/selimozten/agent-trace-hub/releases/latest/download/agent-trace-hub-darwin-arm64.tar.gz">
-            <span>Recommended for this machine</span>
-            <strong>macOS ARM64</strong>
-            <svg class="icon" aria-hidden="true" viewBox="0 0 24 24">
-              <path d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14" />
-            </svg>
-          </a>
-
-          <div class="download-list">
-            <a href="https://github.com/selimozten/agent-trace-hub/releases/latest/download/agent-trace-hub-darwin-arm64.tar.gz"><strong>macOS</strong><span>Apple Silicon</span><small>ARM64</small></a>
-            <a href="https://github.com/selimozten/agent-trace-hub/releases/latest/download/agent-trace-hub-darwin-x64.tar.gz"><strong>macOS</strong><span>Intel</span><small>x64</small></a>
-            <a href="https://github.com/selimozten/agent-trace-hub/releases/latest/download/agent-trace-hub-linux-x64.tar.gz"><strong>Linux</strong><span>Standard</span><small>x64</small></a>
-            <a href="https://github.com/selimozten/agent-trace-hub/releases/latest/download/agent-trace-hub-linux-arm64.tar.gz"><strong>Linux</strong><span>ARM servers</span><small>ARM64</small></a>
-            <a href="https://github.com/selimozten/agent-trace-hub/releases/latest/download/agent-trace-hub-windows-x64.zip"><strong>Windows</strong><span>PowerShell</span><small>x64</small></a>
-            <a href="https://github.com/selimozten/agent-trace-hub/releases/latest/download/SHA256SUMS"><strong>Checksums</strong><span>All archives</span><small>SHA-256</small></a>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <footer class="site-footer">
-      <div class="section-shell footer-main">
-        <div class="footer-brand">
-          <img src="assets/agent-trace-orb-hero.png" alt="" />
-          <strong>Agent Trace Hub</strong>
-          <span data-version>v0.1.0</span>
-        </div>
-        <p>Canonical traces for the models you train next.</p>
         <div class="footer-links">
           <a href="https://github.com/selimozten/agent-trace-hub">Source</a>
           <a href="https://github.com/selimozten/agent-trace-hub/releases">Releases</a>
-          <a href="https://github.com/selimozten/agent-trace-hub/blob/main/README.md">Docs</a>
+          <a href="https://github.com/selimozten/agent-trace-hub/tree/main/schema">Schema</a>
+          <a href="https://github.com/selimozten/agent-trace-hub/blob/main/SECURITY.md">Security</a>
           <a href="https://github.com/selimozten/agent-trace-hub/discussions">Discussions</a>
         </div>
-      </div>
-      <p class="trademark-note section-shell">Agent marks belong to their respective owners. No endorsement or partnership is implied.</p>
-    </footer>
+        <p class="trademark-note">Agent marks belong to their respective owners. No endorsement or partnership is implied.</p>
+        <div class="wordmark-crop" aria-hidden="true">
+          <pre id="ascii-wordmark"></pre>
+        </div>
+      </footer>
+    </main>
 
     <div class="copy-announcement" role="status" aria-live="polite"></div>
   </body>

@@ -3,7 +3,7 @@ document.documentElement.classList.add("js");
 const repository = "selimozten/agent-trace-hub";
 const releaseBase = `https://github.com/${repository}/releases/latest/download`;
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-const coarsePointer = window.matchMedia("(pointer: coarse)");
+const monoStack = '"SFMono-Regular", "SF Mono", Menlo, Consolas, monospace';
 const installCommands = {
   macos: `curl -fsSL https://raw.githubusercontent.com/${repository}/main/install.sh | sh`,
   linux: `curl -fsSL https://raw.githubusercontent.com/${repository}/main/install.sh | sh`,
@@ -17,88 +17,31 @@ const assets = {
   "windows-x64": "agent-trace-hub-windows-x64.zip",
 };
 const sources = {
-  "claude-code": {
-    label: "Claude Code",
-    location: "~/.claude/projects",
-    agent: "claude-code",
-    reasoning: "Inspect the failing test before editing.",
-    tool: "Bash",
-  },
-  codex: {
-    label: "Codex",
-    location: "~/.codex/sessions",
-    agent: "codex",
-    reasoning: "Inspect the failing test first.",
-    tool: "exec_command",
-  },
-  pi: {
-    label: "Pi",
-    location: "~/.pi/agent/sessions",
-    agent: "pi",
-    reasoning: "Replay the active branch before export.",
-    tool: "bash",
-  },
-  opencode: {
-    label: "OpenCode",
-    location: "~/.local/share/opencode/opencode.db",
-    agent: "opencode",
-    reasoning: "Read the session parts in source order.",
-    tool: "bash",
-  },
-  omp: {
-    label: "Oh My Pi",
-    location: "~/.omp/agent/sessions",
-    agent: "omp",
-    reasoning: "Preserve the selected provider route.",
-    tool: "bash",
-  },
-  "cursor-agent": {
-    label: "Cursor Agent CLI",
-    location: "~/.cursor/projects/agent-transcripts",
-    agent: "cursor-agent",
-    reasoning: null,
-    tool: "Shell",
-    toolResultsAvailable: false,
-  },
-};
-const formats = {
-  "openai-chat": "OpenAI chat",
-  "anthropic-messages": "Anthropic Messages",
-  chatml: "ChatML",
-  sharegpt: "ShareGPT",
-  "sft-text": "Plain SFT text",
-  "ornith-qwen-xml": "Ornith / Qwen XML",
+  "claude-code": { location: "~/.claude/projects", kind: "JSONL sessions" },
+  codex: { location: "~/.codex/sessions", kind: "JSONL sessions" },
+  pi: { location: "~/.pi/agent/sessions", kind: "branching JSONL" },
+  opencode: { location: "~/.local/share/opencode/opencode.db", kind: "SQLite parts" },
+  omp: { location: "~/.omp/agent/sessions", kind: "branching JSONL" },
+  "cursor-agent": { location: "~/.cursor/projects", kind: "agent transcripts" },
 };
 
-const sourceSelect = document.querySelector("#source-select");
-const formatSelect = document.querySelector("#format-select");
-const installCommand = document.querySelector("#install-command");
-const platformSwitch = document.querySelector(".platform-switch");
-const platformButtons = [...document.querySelectorAll("[data-install-platform]")];
 const sourceTabs = [...document.querySelectorAll("[data-source-agent]")];
-const recommendedDownload = document.querySelector("#recommended-download");
 const announcement = document.querySelector(".copy-announcement");
 const copyTimers = new WeakMap();
 let announcementTimer;
-let detectedPlatform;
-let userSelectedPlatform = false;
 
 initialize();
 
 async function initialize() {
   bindCopyControls();
   bindSourceTabs();
-  bindTraceLab();
-  bindPlatformSwitch();
-  selectHeroSource("codex");
-  updateTraceLab();
-  initializeAsciiOrb();
+  initializeAsciiScene();
+  initializeWordmark();
 
-  detectedPlatform = await detectPlatform();
-  if (!userSelectedPlatform) {
-    selectInstallPlatform(detectedPlatform.platform);
-    updateDetectedDownload(detectedPlatform);
-  }
+  const detected = await detectPlatform();
+  document.querySelector("#install-command").textContent =
+    installCommands[detected.platform] ?? installCommands.macos;
+  updateDetectedDownload(detected);
   updateLatestVersion();
 }
 
@@ -134,7 +77,7 @@ function bindCopyControls() {
 
 function bindSourceTabs() {
   sourceTabs.forEach((tab, index) => {
-    tab.addEventListener("click", () => selectHeroSource(tab.dataset.sourceAgent));
+    tab.addEventListener("click", () => selectSource(tab.dataset.sourceAgent));
     tab.addEventListener("keydown", (event) => {
       let nextIndex;
       if (event.key === "ArrowRight") nextIndex = (index + 1) % sourceTabs.length;
@@ -143,12 +86,12 @@ function bindSourceTabs() {
       if (event.key === "End") nextIndex = sourceTabs.length - 1;
       if (nextIndex === undefined) return;
       event.preventDefault();
-      selectHeroSource(sourceTabs[nextIndex].dataset.sourceAgent, true);
+      selectSource(sourceTabs[nextIndex].dataset.sourceAgent, true);
     });
   });
 }
 
-function selectHeroSource(key, moveFocus = false) {
+function selectSource(key, moveFocus = false) {
   const source = sources[key] ?? sources.codex;
   const activeTab = sourceTabs.find((tab) => tab.dataset.sourceAgent === key) ?? sourceTabs[1];
   for (const tab of sourceTabs) {
@@ -157,85 +100,25 @@ function selectHeroSource(key, moveFocus = false) {
     tab.tabIndex = selected ? 0 : -1;
   }
 
-  document.querySelector("#hero-source-name").textContent = source.label;
-  document.querySelector("#hero-source-path").textContent = source.location;
+  document.querySelector("#source-path").textContent = source.location;
+  document.querySelector("#source-kind").textContent = source.kind;
   document.querySelector("#source-readout").setAttribute("aria-labelledby", activeTab.id);
-  activeTab.scrollIntoView({ behavior: reducedMotion.matches ? "auto" : "smooth", block: "nearest", inline: "nearest" });
   if (moveFocus) activeTab.focus();
 }
 
-function bindTraceLab() {
-  sourceSelect.addEventListener("change", updateTraceLab);
-  formatSelect.addEventListener("change", updateTraceLab);
-}
-
-function updateTraceLab() {
-  const source = sources[sourceSelect.value];
-  const formatLabel = formats[formatSelect.value];
-  document.querySelector("#artifact-location").textContent = source.location;
-  document.querySelector("#route-source").textContent = source.label;
-  document.querySelector("#route-target").textContent = formatLabel;
-  document.querySelector("#trace-output").innerHTML = renderTraceExample(source);
-}
-
-function renderTraceExample(source) {
-  const reasoning = source.reasoning
-    ? `\n    <span class="json-key">"reasoning"</span>: [<span class="json-string">"${escapeHtml(source.reasoning)}"</span>],`
-    : "";
-  const metadata = source.toolResultsAvailable === false
-    ? `,\n  <span class="json-key">"metadata"</span>: { <span class="json-key">"tool_results_available"</span>: <span class="json-boolean">false</span> }`
-    : "";
-
-  return `<code>{
-  <span class="json-key">"schema"</span>: <span class="json-string">"agent_trace_v1"</span>,
-  <span class="json-key">"source"</span>: { <span class="json-key">"agent"</span>: <span class="json-string">"${escapeHtml(source.agent)}"</span> },
-  <span class="json-key">"messages"</span>: [{
-    <span class="json-key">"role"</span>: <span class="json-string">"assistant"</span>,${reasoning}
-    <span class="json-key">"tool_calls"</span>: [{ <span class="json-key">"name"</span>: <span class="json-string">"${escapeHtml(source.tool)}"</span> }]
-  }],
-  <span class="json-key">"outcome"</span>: { <span class="json-key">"quality"</span>: <span class="json-string">"unlabeled"</span> }${metadata}
-}</code>`;
-}
-
-function bindPlatformSwitch() {
-  for (const button of platformButtons) {
-    button.addEventListener("click", () => {
-      userSelectedPlatform = true;
-      const platform = button.dataset.installPlatform;
-      selectInstallPlatform(platform);
-      if (detectedPlatform?.platform === platform) {
-        updateDetectedDownload(detectedPlatform);
-      } else {
-        updateDetectedDownload({ platform, architecture: platform === "macos" ? "arm64" : "x64" });
-      }
-    });
-  }
-}
-
-function selectInstallPlatform(platform) {
-  const selected = installCommands[platform] ? platform : "macos";
-  const index = ["macos", "linux", "windows"].indexOf(selected);
-  platformSwitch.style.setProperty("--platform-index", index);
-  installCommand.textContent = installCommands[selected];
-
-  for (const button of platformButtons) {
-    button.setAttribute("aria-pressed", String(button.dataset.installPlatform === selected));
-  }
-}
-
 function updateDetectedDownload({ platform, architecture }) {
-  const key = `${platform}-${architecture}`;
-  const asset = assets[key];
-  const strong = recommendedDownload.querySelector("strong");
+  const link = document.querySelector("#recommended-download");
+  const label = document.querySelector("#recommended-label");
+  const asset = assets[`${platform}-${architecture}`];
   if (!asset) {
-    recommendedDownload.href = `https://github.com/${repository}/releases/latest`;
-    strong.textContent = "View all release files";
+    link.href = `https://github.com/${repository}/releases/latest`;
+    label.textContent = "View release files";
     return;
   }
 
-  recommendedDownload.href = `${releaseBase}/${asset}`;
-  const architectureLabel = architecture === "arm64" ? "ARM64" : "x64";
-  strong.textContent = `${platformLabel(platform)} ${architectureLabel}`;
+  link.href = `${releaseBase}/${asset}`;
+  const platformName = { macos: "macOS", linux: "Linux", windows: "Windows" }[platform];
+  label.textContent = `Download · ${platformName} ${architecture === "arm64" ? "ARM64" : "x64"}`;
 }
 
 async function detectPlatform() {
@@ -279,234 +162,244 @@ async function updateLatestVersion() {
   }
 }
 
-async function initializeAsciiOrb() {
-  if (reducedMotion.matches || coarsePointer.matches) return;
-
-  const hero = document.querySelector(".hero");
-  const stage = document.querySelector(".ascii-stage");
-  const canvas = document.querySelector("#ascii-orb");
+/* ---- ASCII 3D scene ---------------------------------------------------
+ * A spinning torus rendered as text — classic donut math, no dependencies.
+ * The tumble follows the pointer; luminance picks both glyph and opacity.
+ */
+function initializeAsciiScene() {
+  const canvas = document.querySelector("#ascii-scene");
+  const panel = canvas.parentElement;
   const context = canvas.getContext("2d", { alpha: true });
   if (!context) return;
 
-  let text;
-  try {
-    const response = await fetch("assets/agent-trace-orb.txt");
-    if (!response.ok) return;
-    text = (await response.text()).trimEnd();
-  } catch {
-    return;
-  }
-
-  const lines = text.split("\n");
-  const maxColumns = Math.max(...lines.map((line) => line.length));
-  const particles = [];
-  const pointer = { x: 0, y: 0, lastX: 0, lastY: 0, active: false };
-  // The orb is shaded by glyph density: "#" is the background field, "@" the core.
-  const glyphAlpha = {
-    "#": 0.1,
-    "@": 1,
-    "%": 0.85,
-    "=": 0.7,
-    "*": 0.6,
-    "+": 0.48,
-    "-": 0.36,
-    ":": 0.27,
-    ".": 0.2,
-  };
+  const RAMP = ".,-~:;=!*#%@";
+  const R1 = 1;
+  const R2 = 2;
+  const K2 = 5;
+  const fontSize = 13;
+  let cellWidth = 8;
+  let cellHeight = fontSize * 1.06;
+  let columns = 0;
+  let rows = 0;
   let width = 0;
   let height = 0;
-  let dpr = 1;
-  let fontSize = 12;
+  let angleA = 1.1;
+  let angleB = 0.55;
+  let tiltX = 0;
+  let tiltY = 0;
+  let targetTiltX = 0;
+  let targetTiltY = 0;
   let animationFrame = 0;
-  let materialized = false;
+
+  let cellLuminance = new Float32Array(0);
+  let cellDepth = new Float32Array(0);
 
   function layout() {
-    const bounds = hero.getBoundingClientRect();
+    const bounds = panel.getBoundingClientRect();
     width = Math.max(1, Math.round(bounds.width));
     height = Math.max(1, Math.round(bounds.height));
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     canvas.width = Math.round(width * dpr);
     canvas.height = Math.round(height * dpr);
     canvas.style.width = `${width}px`;
     canvas.style.height = `${height}px`;
     context.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-    const mobile = width <= 760;
-    const shortMobile = mobile && height <= 650;
-    const shortLandscape = width >= 560 && height <= 520;
-    const targetWidth = shortLandscape
-      ? Math.min(300, width * 0.36)
-      : mobile
-        ? Math.min(width - 44, shortMobile ? 185 : 280)
-        : Math.min(width * 0.54, 730);
-
-    // Measure the real glyph advance so the art keeps its intended width on
-    // machines without SF Mono instead of overflowing the hero.
-    context.font = '100px "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace';
-    const advanceRatio = context.measureText("M").width / 100;
-    fontSize = targetWidth / (maxColumns * advanceRatio);
-    const characterWidth = fontSize * advanceRatio;
-    const artWidth = maxColumns * characterWidth;
-    const lineHeight = fontSize * 1.08;
-    const artHeight = lines.length * lineHeight;
-    const originX = shortLandscape
-      ? width - artWidth - 24
-      : mobile
-        ? (width - artWidth) / 2
-        : width - artWidth - Math.max(24, (width - 1280) / 2);
-    const originY = shortLandscape
-      ? 78
-      : mobile
-        ? (shortMobile ? 62 : 54)
-        : Math.max(62, Math.min(104, (height - artHeight) * 0.16));
-
-    context.font = `${fontSize}px "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace`;
+    context.font = `${fontSize}px ${monoStack}`;
     context.textBaseline = "top";
-    particles.length = 0;
-
-    lines.forEach((line, row) => {
-      [...line].forEach((character, column) => {
-        if (character === " ") return;
-        const homeX = originX + column * characterWidth;
-        const homeY = originY + row * lineHeight;
-        particles.push({
-          character,
-          alpha: glyphAlpha[character] ?? 0.5,
-          homeX,
-          homeY,
-          x: homeX,
-          y: homeY,
-          vx: 0,
-          vy: 0,
-          energy: 0,
-        });
-      });
-    });
-
-    if (!materialized) {
-      materialized = true;
-      scatterParticles();
-      stage.dataset.ready = "true";
-      wake();
-      return;
-    }
-
-    draw();
-    stage.dataset.ready = "true";
+    cellWidth = context.measureText("M").width;
+    columns = Math.ceil(width / cellWidth);
+    rows = Math.ceil(height / cellHeight);
+    cellLuminance = new Float32Array(columns * rows);
+    cellDepth = new Float32Array(columns * rows);
+    render();
   }
 
-  // First paint: the trace characters fly in from a loose cloud and settle
-  // into the orb, glowing briefly while they still carry energy.
-  function scatterParticles() {
-    const spread = Math.max(width, height) * 0.22;
-    for (const particle of particles) {
-      const angle = Math.random() * Math.PI * 2;
-      const distance = spread * (0.3 + Math.random() * 0.7);
-      particle.x = particle.homeX + Math.cos(angle) * distance;
-      particle.y = particle.homeY + Math.sin(angle) * distance;
-      particle.vx = 0;
-      particle.vy = 0;
-      particle.energy = 0.35 + Math.random() * 0.45;
-    }
-  }
+  function render() {
+    const A = angleA + tiltY;
+    const B = angleB + tiltX;
+    const cosA = Math.cos(A);
+    const sinA = Math.sin(A);
+    const cosB = Math.cos(B);
+    const sinB = Math.sin(B);
+    // Scale so the torus fills ~72% of the panel's smaller side.
+    const K1 = (Math.min(width, height) * 0.72) / (2 * (R1 + R2) / K2);
+    const centerX = width / 2;
+    const centerY = height / 2 + height * 0.02;
 
-  function disturb(event) {
-    const bounds = hero.getBoundingClientRect();
-    pointer.x = event.clientX - bounds.left;
-    pointer.y = event.clientY - bounds.top;
-    const moveX = pointer.active ? pointer.x - pointer.lastX : 0;
-    const moveY = pointer.active ? pointer.y - pointer.lastY : 0;
-    const speed = Math.min(34, Math.hypot(moveX, moveY));
-    const radius = Math.max(78, Math.min(142, Math.min(width, height) * 0.15));
+    cellLuminance.fill(0);
+    cellDepth.fill(0);
 
-    for (const particle of particles) {
-      const offsetX = particle.x - pointer.x;
-      const offsetY = particle.y - pointer.y;
-      const distance = Math.hypot(offsetX, offsetY);
-      if (distance >= radius) continue;
+    for (let theta = 0; theta < Math.PI * 2; theta += 0.07) {
+      const cosTheta = Math.cos(theta);
+      const sinTheta = Math.sin(theta);
+      const circleX = R2 + R1 * cosTheta;
+      const circleY = R1 * sinTheta;
 
-      const falloff = (1 - distance / radius) ** 2;
-      const normalX = distance > 0.001 ? offsetX / distance : 0;
-      const normalY = distance > 0.001 ? offsetY / distance : -1;
-      const push = (3.2 + speed * 0.38) * falloff;
-      const flow = 0.32 * falloff;
-      const swirl = Math.min(5, speed * 0.12) * falloff;
-      particle.vx += normalX * push + moveX * flow - normalY * swirl;
-      particle.vy += normalY * push + moveY * flow + normalX * swirl;
-      particle.energy = Math.min(1, particle.energy + falloff * 0.95);
-    }
+      for (let phi = 0; phi < Math.PI * 2; phi += 0.02) {
+        const cosPhi = Math.cos(phi);
+        const sinPhi = Math.sin(phi);
 
-    pointer.lastX = pointer.x;
-    pointer.lastY = pointer.y;
-    pointer.active = true;
-    wake();
-  }
+        const x = circleX * (cosB * cosPhi + sinA * sinB * sinPhi) - circleY * cosA * sinB;
+        const y = circleX * (sinB * cosPhi - sinA * cosB * sinPhi) + circleY * cosA * cosB;
+        const z = K2 + cosA * circleX * sinPhi + circleY * sinA;
+        const ooz = 1 / z;
 
-  function settlePointer() {
-    pointer.active = false;
-  }
+        const column = Math.floor((centerX + K1 * ooz * x) / cellWidth);
+        const row = Math.floor((centerY - K1 * ooz * y) / cellHeight);
+        if (column < 0 || column >= columns || row < 0 || row >= rows) continue;
 
-  function wake() {
-    if (!animationFrame) animationFrame = window.requestAnimationFrame(tick);
-  }
-
-  function tick() {
-    let moving = false;
-    for (const particle of particles) {
-      particle.vx += (particle.homeX - particle.x) * 0.052;
-      particle.vy += (particle.homeY - particle.y) * 0.052;
-      particle.vx *= 0.835;
-      particle.vy *= 0.835;
-      particle.x += particle.vx;
-      particle.y += particle.vy;
-      particle.energy *= 0.9;
-
-      const displacement = Math.hypot(particle.x - particle.homeX, particle.y - particle.homeY);
-      const velocity = Math.hypot(particle.vx, particle.vy);
-      if (displacement > 0.04 || velocity > 0.04 || particle.energy > 0.01) {
-        moving = true;
-      } else {
-        particle.x = particle.homeX;
-        particle.y = particle.homeY;
-        particle.vx = 0;
-        particle.vy = 0;
-        particle.energy = 0;
+        const luminance =
+          cosPhi * cosTheta * sinB
+          - cosA * cosTheta * sinPhi
+          - sinA * sinTheta
+          + cosB * (cosA * sinTheta - cosTheta * sinA * sinPhi);
+        const index = row * columns + column;
+        if (ooz > cellDepth[index]) {
+          cellDepth[index] = ooz;
+          cellLuminance[index] = luminance;
+        }
       }
     }
 
-    draw();
-    animationFrame = moving ? window.requestAnimationFrame(tick) : 0;
-  }
-
-  function draw() {
     context.clearRect(0, 0, width, height);
-    context.font = `${fontSize}px "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace`;
-    context.textBaseline = "top";
-    for (const particle of particles) {
-      const energy = Math.min(1, particle.energy);
-      const red = Math.round(243 + 12 * energy);
-      const green = Math.round(247 - 146 * energy);
-      const blue = Math.round(239 - 173 * energy);
-      const alpha = particle.alpha + (1 - particle.alpha) * energy;
-      context.fillStyle = `rgb(${red} ${green} ${blue} / ${alpha.toFixed(3)})`;
-      context.fillText(particle.character, particle.x, particle.y);
+    context.font = `${fontSize}px ${monoStack}`;
+    for (let row = 0; row < rows; row += 1) {
+      for (let column = 0; column < columns; column += 1) {
+        const index = row * columns + column;
+        if (cellDepth[index] === 0) continue;
+        const luminance = Math.max(0, cellLuminance[index]) / Math.SQRT2;
+        const glyph = RAMP[Math.min(RAMP.length - 1, Math.floor(luminance * RAMP.length))];
+        const alpha = 0.045 + luminance * 0.3;
+        context.fillStyle = `rgb(240 244 234 / ${alpha.toFixed(3)})`;
+        context.fillText(glyph, column * cellWidth, row * cellHeight);
+      }
     }
   }
 
-  hero.addEventListener("pointermove", disturb, { passive: true });
-  hero.addEventListener("pointerleave", settlePointer, { passive: true });
-  hero.addEventListener("pointercancel", settlePointer, { passive: true });
-  const observer = new ResizeObserver(([entry]) => {
-    if (
-      Math.round(entry.contentRect.width) === width
-      && Math.round(entry.contentRect.height) === height
-    ) return;
-    window.cancelAnimationFrame(animationFrame);
-    animationFrame = 0;
-    layout();
-  });
-  observer.observe(hero);
+  function tick() {
+    angleA += 0.0058;
+    angleB += 0.0031;
+    tiltX += (targetTiltX - tiltX) * 0.045;
+    tiltY += (targetTiltY - tiltY) * 0.045;
+    render();
+    animationFrame = window.requestAnimationFrame(tick);
+  }
+
+  const observer = new ResizeObserver(() => layout());
+  observer.observe(panel);
   layout();
+
+  if (reducedMotion.matches) return;
+
+  panel.addEventListener("pointermove", (event) => {
+    const bounds = panel.getBoundingClientRect();
+    targetTiltX = ((event.clientX - bounds.left) / bounds.width - 0.5) * 1.1;
+    targetTiltY = ((event.clientY - bounds.top) / bounds.height - 0.5) * 0.8;
+  }, { passive: true });
+  panel.addEventListener("pointerleave", () => {
+    targetTiltX = 0;
+    targetTiltY = 0;
+  }, { passive: true });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+      window.cancelAnimationFrame(animationFrame);
+      animationFrame = 0;
+    } else if (!animationFrame) {
+      animationFrame = window.requestAnimationFrame(tick);
+    }
+  });
+
+  animationFrame = window.requestAnimationFrame(tick);
+}
+
+/* ---- ASCII footer wordmark --------------------------------------------
+ * Draws the wordmark into an offscreen canvas, then maps pixel coverage onto a
+ * glyph ramp so the wordmark scales with the footer at any width.
+ */
+function initializeWordmark() {
+  const pre = document.querySelector("#ascii-wordmark");
+  if (!pre) return;
+  const glyphSets = [
+    { threshold: 0.82, glyphs: "@@@@#" },
+    { threshold: 0.58, glyphs: "@%#o" },
+    { threshold: 0.38, glyphs: "*=x&" },
+    { threshold: 0.2, glyphs: "+:-o" },
+  ];
+
+  function render() {
+    const style = window.getComputedStyle(pre);
+    const preFontSize = Number.parseFloat(style.fontSize);
+    const lineHeight = Number.parseFloat(style.lineHeight) || preFontSize * 1.04;
+    const available = pre.parentElement.clientWidth;
+    if (!available) return;
+
+    const probe = document.createElement("canvas").getContext("2d");
+    probe.font = `${preFontSize}px ${monoStack}`;
+    const charWidth = probe.measureText("M").width;
+    const columns = Math.floor(available / charWidth);
+    // Text pixels map 1:1 onto character cells, so pre-stretch the text
+    // horizontally to cancel the cell's tall aspect ratio.
+    const stretch = lineHeight / charWidth;
+
+    // The full name spans the width at a footer-friendly height; three
+    // giant letters only fit on narrow screens.
+    const text = columns < 160 ? "ath" : "agent trace hub";
+    probe.font = `800 100px "Bricolage Grotesque", sans-serif`;
+    const measured = probe.measureText(text);
+    const scale = (columns * 0.97) / (measured.width * stretch);
+    const fontPx = 100 * scale;
+    const rowCount = Math.ceil(fontPx * 1.1);
+
+    const canvas = document.createElement("canvas");
+    canvas.width = columns;
+    canvas.height = rowCount;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    context.setTransform(stretch * scale, 0, 0, scale, (columns - measured.width * stretch * scale) / 2, 0);
+    context.font = `800 100px "Bricolage Grotesque", sans-serif`;
+    context.textBaseline = "top";
+    context.fillStyle = "#ffffff";
+    context.fillText(text, 0, 8);
+
+    const pixels = context.getImageData(0, 0, columns, rowCount).data;
+    const lines = [];
+    for (let row = 0; row < rowCount; row += 1) {
+      let line = "";
+      for (let column = 0; column < columns; column += 1) {
+        const coverage = pixels[(row * columns + column) * 4 + 3] / 255;
+        let glyph = " ";
+        for (const set of glyphSets) {
+          if (coverage >= set.threshold) {
+            glyph = set.glyphs[Math.floor(Math.random() * set.glyphs.length)];
+            break;
+          }
+        }
+        line += glyph;
+      }
+      lines.push(line);
+    }
+
+    while (lines.length && lines[0].trim() === "") lines.shift();
+    while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
+    pre.textContent = lines.join("\n");
+  }
+
+  const start = () => {
+    render();
+    let lastWidth = pre.parentElement.clientWidth;
+    new ResizeObserver(() => {
+      const nextWidth = pre.parentElement.clientWidth;
+      if (nextWidth === lastWidth) return;
+      lastWidth = nextWidth;
+      render();
+    }).observe(pre.parentElement);
+  };
+
+  if (document.fonts?.load) {
+    document.fonts.load('800 100px "Bricolage Grotesque"').then(start, start);
+  } else {
+    start();
+  }
 }
 
 function announce(message) {
@@ -516,17 +409,4 @@ function announce(message) {
   announcementTimer = window.setTimeout(() => {
     delete announcement.dataset.visible;
   }, 1800);
-}
-
-function platformLabel(platform) {
-  return { macos: "macOS", linux: "Linux", windows: "Windows" }[platform] ?? "Platform";
-}
-
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
 }
