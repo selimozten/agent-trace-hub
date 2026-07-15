@@ -100,9 +100,22 @@ function selectSource(key, moveFocus = false) {
     tab.tabIndex = selected ? 0 : -1;
   }
 
-  document.querySelector("#source-path").textContent = source.location;
+  const readout = document.querySelector("#source-readout");
+  const path = document.querySelector("#source-path");
+  const changed = path.textContent !== source.location;
+  path.textContent = source.location;
   document.querySelector("#source-kind").textContent = source.kind;
-  document.querySelector("#source-readout").setAttribute("aria-labelledby", activeTab.id);
+  readout.setAttribute("aria-labelledby", activeTab.id);
+  if (changed && !reducedMotion.matches && readout.animate) {
+    // A touch of blur masks the text swap so it reads as one element changing.
+    readout.animate(
+      [
+        { opacity: 0.3, filter: "blur(3px)" },
+        { opacity: 1, filter: "blur(0px)" },
+      ],
+      { duration: 200, easing: "cubic-bezier(0.23, 1, 0.32, 1)" },
+    );
+  }
   if (moveFocus) activeTab.focus();
 }
 
@@ -301,16 +314,26 @@ function initializeAsciiScene() {
     targetTiltY = 0;
   }, { passive: true });
 
-  document.addEventListener("visibilitychange", () => {
-    if (document.hidden) {
+  // Spin only while the hero can actually be seen.
+  let heroVisible = true;
+
+  function syncLoop() {
+    const shouldRun = heroVisible && !document.hidden;
+    if (shouldRun && !animationFrame) {
+      animationFrame = window.requestAnimationFrame(tick);
+    } else if (!shouldRun && animationFrame) {
       window.cancelAnimationFrame(animationFrame);
       animationFrame = 0;
-    } else if (!animationFrame) {
-      animationFrame = window.requestAnimationFrame(tick);
     }
-  });
+  }
 
-  animationFrame = window.requestAnimationFrame(tick);
+  document.addEventListener("visibilitychange", syncLoop);
+  new IntersectionObserver(([entry]) => {
+    heroVisible = entry.isIntersecting;
+    syncLoop();
+  }).observe(panel);
+
+  syncLoop();
 }
 
 /* ---- ASCII footer wordmark --------------------------------------------

@@ -71,6 +71,14 @@ button {
   cursor: pointer;
 }
 
+button,
+.button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -220,6 +228,7 @@ pre {
   line-height: 1;
   letter-spacing: -0.01em;
   text-shadow: 0 2px 26px rgba(5, 6, 4, 0.95), 0 0 4px rgba(5, 6, 4, 0.7);
+  text-wrap: balance;
 }
 
 .hero h1 em {
@@ -235,6 +244,7 @@ pre {
   font-weight: 450;
   line-height: 1.55;
   text-shadow: 0 1px 14px rgba(5, 6, 4, 0.95), 0 0 3px rgba(5, 6, 4, 0.8);
+  text-wrap: pretty;
 }
 
 .hero-sub code {
@@ -273,7 +283,11 @@ pre {
   color: var(--muted);
   font-family: var(--mono);
   font-size: 12px;
-  transition: background-color 140ms ease, color 140ms ease;
+  transition: background-color 140ms ease, color 140ms ease, transform 120ms var(--ease-out);
+}
+
+.source-tabs button:active {
+  transform: scale(0.96);
 }
 
 .source-tabs button[aria-selected="true"] {
@@ -339,6 +353,8 @@ pre {
   font-size: 12.5px;
   scrollbar-width: none;
   white-space: nowrap;
+  mask-image: linear-gradient(to right, #000 0%, #000 calc(100% - 26px), transparent);
+  -webkit-mask-image: linear-gradient(to right, #000 0%, #000 calc(100% - 26px), transparent);
 }
 
 .cmd code::-webkit-scrollbar {
@@ -353,7 +369,11 @@ pre {
   align-items: center;
   justify-content: center;
   color: var(--muted);
-  transition: color 140ms ease;
+  transition: color 140ms ease, transform 120ms var(--ease-out);
+}
+
+.copy-control:active {
+  transform: scale(0.9);
 }
 
 .check-icon {
@@ -364,9 +384,22 @@ pre {
   display: none;
 }
 
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .copy-control[data-copied="true"] .check-icon {
   display: block;
   color: var(--signal);
+  animation: pop-in 180ms var(--ease-out);
 }
 
 .or-line {
@@ -521,12 +554,15 @@ button:focus-visible {
   opacity: 0;
   pointer-events: none;
   transform: translateY(8px);
-  transition: opacity 160ms ease, transform 180ms var(--ease-out);
+  /* exit: quick and quiet */
+  transition: opacity 120ms ease, transform 120ms ease;
 }
 
 .copy-announcement[data-visible="true"] {
   opacity: 1;
   transform: translateY(0);
+  /* enter: a touch more presence */
+  transition: opacity 180ms var(--ease-out), transform 200ms var(--ease-out);
 }
 
 /* ---- load choreography ------------------------------------------------ */
@@ -558,6 +594,30 @@ button:focus-visible {
 .js .hero-meta {
   animation: rise-in 620ms var(--ease-out) 270ms backwards;
 }
+
+@keyframes rise-in-sm {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* tabs cascade in just after the console lands */
+.js .source-tabs button {
+  animation: rise-in-sm 380ms var(--ease-out) backwards;
+}
+
+.js .source-tabs button:nth-child(1) { animation-delay: 300ms; }
+.js .source-tabs button:nth-child(2) { animation-delay: 335ms; }
+.js .source-tabs button:nth-child(3) { animation-delay: 370ms; }
+.js .source-tabs button:nth-child(4) { animation-delay: 405ms; }
+.js .source-tabs button:nth-child(5) { animation-delay: 440ms; }
+.js .source-tabs button:nth-child(6) { animation-delay: 475ms; }
 
 /* ---- responsive ------------------------------------------------------- */
 
