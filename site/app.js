@@ -43,6 +43,7 @@ async function initialize() {
     installCommands[detected.platform] ?? installCommands.macos;
   updateDetectedDownload(detected);
   updateLatestVersion();
+  updateStarCount();
 }
 
 function bindCopyControls() {
@@ -157,6 +158,23 @@ async function detectPlatform() {
   }
 
   return { platform, architecture };
+}
+
+async function updateStarCount() {
+  try {
+    const response = await fetch(`https://api.github.com/repos/${repository}`, {
+      headers: { Accept: "application/vnd.github+json" },
+    });
+    if (!response.ok) return;
+    const { stargazers_count: stars } = await response.json();
+    // A tiny count reads worse than none at all.
+    if (!Number.isInteger(stars) || stars < 5) return;
+    const node = document.querySelector("#star-count");
+    node.textContent = ` · ★ ${stars.toLocaleString("en-US")}`;
+    node.hidden = false;
+  } catch {
+    // The footer works fine without the count.
+  }
 }
 
 async function updateLatestVersion() {
@@ -294,9 +312,20 @@ function initializeAsciiScene() {
     }
   }
 
+  // Dragging empty hero space spins the torus; momentum carries after release.
+  let dragging = false;
+  let dragX = 0;
+  let dragY = 0;
+  let spinA = 0;
+  let spinB = 0;
+
   function tick() {
-    angleA += 0.0058;
-    angleB += 0.0031;
+    angleA += 0.0058 + spinA;
+    angleB += 0.0031 + spinB;
+    if (!dragging) {
+      spinA *= 0.95;
+      spinB *= 0.95;
+    }
     tiltX += (targetTiltX - tiltX) * 0.045;
     tiltY += (targetTiltY - tiltY) * 0.045;
     render();
@@ -309,12 +338,37 @@ function initializeAsciiScene() {
 
   if (reducedMotion.matches) return;
 
+  panel.addEventListener("pointerdown", (event) => {
+    if (event.target.closest("a, button, .console, .hero-nav, h1, p, code")) return;
+    dragging = true;
+    dragX = event.clientX;
+    dragY = event.clientY;
+    panel.setPointerCapture?.(event.pointerId);
+    document.body.classList.add("scene-drag");
+  });
+
   panel.addEventListener("pointermove", (event) => {
+    if (dragging) {
+      spinB = Math.max(-0.14, Math.min(0.14, (event.clientX - dragX) * 0.0035));
+      spinA = Math.max(-0.14, Math.min(0.14, (event.clientY - dragY) * 0.0035));
+      dragX = event.clientX;
+      dragY = event.clientY;
+      return;
+    }
     const bounds = panel.getBoundingClientRect();
     targetTiltX = ((event.clientX - bounds.left) / bounds.width - 0.5) * 1.1;
     targetTiltY = ((event.clientY - bounds.top) / bounds.height - 0.5) * 0.8;
   }, { passive: true });
+
+  function endDrag() {
+    dragging = false;
+    document.body.classList.remove("scene-drag");
+  }
+
+  panel.addEventListener("pointerup", endDrag, { passive: true });
+  panel.addEventListener("pointercancel", endDrag, { passive: true });
   panel.addEventListener("pointerleave", () => {
+    endDrag();
     targetTiltX = 0;
     targetTiltY = 0;
   }, { passive: true });
@@ -409,17 +463,65 @@ function initializeWordmark() {
 
     while (lines.length && lines[0].trim() === "") lines.shift();
     while (lines.length && lines[lines.length - 1].trim() === "") lines.pop();
-    pre.textContent = lines.join("\n");
+    return lines;
+  }
+
+  let finalLines = [];
+  let revealed = false;
+
+  function show() {
+    finalLines = render() ?? [];
+    pre.textContent = finalLines.join("\n");
+  }
+
+  // First time the footer scrolls into view, the letters resolve out of noise.
+  function reveal() {
+    if (revealed || reducedMotion.matches || !finalLines.length) {
+      revealed = true;
+      return;
+    }
+    revealed = true;
+    const NOISE = "@#%&x*=+o:-";
+    const FRAMES = 11;
+    let frame = 0;
+
+    function step() {
+      frame += 1;
+      const settle = frame / FRAMES;
+      if (settle >= 1) {
+        pre.textContent = finalLines.join("\n");
+        return;
+      }
+      pre.textContent = finalLines
+        .map((line) =>
+          [...line]
+            .map((glyph) =>
+              glyph !== " " && Math.random() > settle
+                ? NOISE[Math.floor(Math.random() * NOISE.length)]
+                : glyph,
+            )
+            .join(""),
+        )
+        .join("\n");
+      window.setTimeout(() => window.requestAnimationFrame(step), 40);
+    }
+
+    step();
   }
 
   const start = () => {
-    render();
+    show();
+    new IntersectionObserver((entries, observer) => {
+      if (!entries[0].isIntersecting) return;
+      observer.disconnect();
+      reveal();
+    }, { threshold: 0.2 }).observe(pre);
     let lastWidth = pre.parentElement.clientWidth;
     new ResizeObserver(() => {
       const nextWidth = pre.parentElement.clientWidth;
       if (nextWidth === lastWidth) return;
       lastWidth = nextWidth;
-      render();
+      show();
     }).observe(pre.parentElement);
   };
 
