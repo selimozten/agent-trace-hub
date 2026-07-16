@@ -197,6 +197,7 @@ pre {
 .wordmark img {
   width: 26px;
   height: 26px;
+  border-radius: 7px;
   object-fit: contain;
 }
 
