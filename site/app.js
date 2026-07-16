@@ -283,7 +283,12 @@ function initializeAsciiScene() {
         const luminance = Math.max(0, cellLuminance[index]) / Math.SQRT2;
         const glyph = RAMP[Math.min(RAMP.length - 1, Math.floor(luminance * RAMP.length))];
         const alpha = 0.045 + luminance * 0.3;
-        context.fillStyle = `rgb(240 244 234 / ${alpha.toFixed(3)})`;
+        // Highlights drift warm so the accent color lives in the light.
+        const warmth = luminance * luminance;
+        const red = Math.round(240 + 15 * warmth);
+        const green = Math.round(244 - 12 * warmth);
+        const blue = Math.round(234 - 46 * warmth);
+        context.fillStyle = `rgb(${red} ${green} ${blue} / ${alpha.toFixed(3)})`;
         context.fillText(glyph, column * cellWidth, row * cellHeight);
       }
     }

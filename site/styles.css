@@ -130,6 +130,7 @@ pre {
   border: 1px solid var(--line-soft);
   border-radius: 22px;
   background: var(--panel);
+  box-shadow: inset 0 1px 0 rgba(240, 244, 234, 0.05);
   isolation: isolate;
 }
 
@@ -151,6 +152,18 @@ pre {
   display: flex;
   min-height: calc(100svh - 2 * var(--gutter));
   flex-direction: column;
+}
+
+/* atmosphere: a soft core glow behind the torus, a vignette at the edges */
+.hero::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 58% 46% at 50% 40%, rgba(240, 244, 234, 0.055), transparent 68%),
+    radial-gradient(ellipse 120% 100% at 50% 50%, transparent 58%, rgba(0, 0, 0, 0.5) 100%);
+  pointer-events: none;
 }
 
 #ascii-scene {
@@ -206,6 +219,19 @@ pre {
   transition: color 150ms ease;
 }
 
+.out-arrow {
+  display: inline-block;
+  color: var(--faint);
+  transition: transform 150ms var(--ease-out), color 150ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .nav-links a:hover .out-arrow {
+    color: var(--paper);
+    transform: translate(1px, -1px);
+  }
+}
+
 .hero-center {
   position: relative;
   z-index: 2;
@@ -232,6 +258,7 @@ pre {
 }
 
 .hero h1 em {
+  color: #ffc9b0;
   font-style: italic;
   letter-spacing: 0;
 }
@@ -263,6 +290,10 @@ pre {
   background: rgba(6, 8, 5, 0.62);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  box-shadow:
+    inset 0 1px 0 rgba(240, 244, 234, 0.07),
+    0 30px 70px -24px rgba(0, 0, 0, 0.7),
+    0 4px 14px rgba(0, 0, 0, 0.35);
   text-align: left;
 }
 
@@ -337,6 +368,7 @@ pre {
   border: 1px solid var(--line-soft);
   border-radius: 11px;
   background: #000000;
+  box-shadow: inset 0 1px 5px rgba(0, 0, 0, 0.55);
 }
 
 .prompt {
@@ -432,12 +464,16 @@ pre {
 }
 
 .button.primary {
-  background: var(--paper);
+  background: linear-gradient(to bottom, #ffffff, #e6ebdd);
+  box-shadow:
+    inset 0 -1px 0 rgba(0, 0, 0, 0.14),
+    0 1px 3px rgba(0, 0, 0, 0.45);
   color: #000000;
 }
 
 .button.ghost {
   border: 1px solid var(--line);
+  background: rgba(240, 244, 234, 0.03);
   color: var(--muted);
 }
 
@@ -496,11 +532,15 @@ pre {
 
 #ascii-wordmark {
   margin: 0 0 -1.6em;
-  color: var(--muted);
   font-size: 8px;
   line-height: 1.04;
   text-align: center;
   user-select: none;
+  /* letters sink into the bottom edge */
+  background: linear-gradient(to bottom, rgba(240, 244, 234, 0.72), rgba(240, 244, 234, 0.16));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 html:not(.js) .wordmark-crop {
@@ -531,7 +571,7 @@ button:focus-visible {
   }
 
   .button.primary:hover {
-    background: #ffffff;
+    background: linear-gradient(to bottom, #ffffff, #f2f5ea);
   }
 
   .button.ghost:hover {
