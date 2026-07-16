@@ -25,7 +25,8 @@
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="canonical" href="https://selimozten.github.io/agent-trace-hub/" />
     <title>Agent Trace Hub</title>
-    <link rel="icon" href="assets/agent-trace-orb.png" type="image/png" />
+    <link rel="icon" href="assets/favicon.png" type="image/png" />
+    <link rel="apple-touch-icon" href="assets/favicon.png" />
     <link
       rel="preload"
       href="assets/fonts/instrument-serif-latin.woff2"
@@ -47,8 +48,8 @@
       type="font/woff2"
       crossorigin
     />
-    <link rel="stylesheet" href="styles.css?v=0.2.2" />
-    <script src="app.js?v=0.2.2" defer></script>
+    <link rel="stylesheet" href="styles.css?v=0.2.3" />
+    <script src="app.js?v=0.2.3" defer></script>
   </head>
   <body>
     <a class="skip-link" href="#main">Skip to content</a>
@@ -77,9 +78,9 @@
 
           <div class="console">
             <div class="source-tabs" role="tablist" aria-label="Coding-agent source">
-              <button id="tab-claude-code" type="button" role="tab" aria-selected="false" aria-controls="source-readout" data-source-agent="claude-code" tabindex="-1">
+              <button id="tab-claude-code" type="button" role="tab" aria-selected="false" aria-controls="source-readout" data-source-agent="claude-code" aria-label="Claude Code" tabindex="-1">
                 <img src="assets/agents/claude-code.svg" alt="" />
-                <span>Claude&nbsp;Code</span>
+                <span>Claude</span>
               </button>
               <button id="tab-codex" type="button" role="tab" aria-selected="true" aria-controls="source-readout" data-source-agent="codex" tabindex="0">
                 <img src="assets/agents/codex.png" alt="" />
@@ -123,7 +124,7 @@
               </button>
             </div>
 
-            <p class="or-line" aria-hidden="true">⌃ or grab the binary</p>
+            <p class="or-line" aria-hidden="true">^ or grab the binary</p>
 
             <div class="actions">
               <a class="button primary" id="recommended-download" href="https://github.com/selimozten/agent-trace-hub/releases/latest/download/agent-trace-hub-darwin-arm64.tar.gz">

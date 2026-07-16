@@ -298,23 +298,31 @@ pre {
 }
 
 .source-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
   padding-bottom: 8px;
 }
 
 .source-tabs button {
   display: inline-flex;
+  min-width: 0;
   min-height: 38px;
   align-items: center;
+  justify-content: center;
   gap: 7px;
-  padding: 6px 11px;
+  padding: 6px 4px;
   border-radius: 9px;
   color: var(--muted);
   font-family: var(--mono);
   font-size: 12px;
   transition: background-color 140ms ease, color 140ms ease, transform 120ms var(--ease-out);
+}
+
+.source-tabs button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .source-tabs button:active {
@@ -692,11 +700,6 @@ button:focus-visible {
 
   .source-tabs button span {
     display: none;
-  }
-
-  .source-tabs button {
-    flex: 1;
-    justify-content: center;
   }
 
   .cmd code {
