@@ -49,8 +49,8 @@
     "@huggingface/hub": "^2.11.0"
   },
   "devDependencies": {
-    "@types/node": "^24.3.0",
-    "@typescript/native-preview": "7.0.0-dev.20260120.1",
-    "typescript": "^5.9.2"
+    "@types/node": "^26.1.1",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
+    "typescript": "^7.0.2"
   }
 }
